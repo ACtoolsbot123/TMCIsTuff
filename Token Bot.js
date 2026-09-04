@@ -139,12 +139,28 @@ function extractDeviceIdFromToken(bearerToken) {
     }
 }
 
+// --- EXTRACT AUTH ID FROM JWT (custom auth ID) ---
+function extractAuthIdFromToken(bearerToken) {
+    try {
+        const payload = decodeJwt(bearerToken);
+        if (!payload) return null;
+
+        if (payload.vrs && payload.vrs.authID) {
+            return payload.vrs.authID;
+        }
+
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
 // --- EXTRACT USERNAME FROM JWT ---
 function extractUsernameFromToken(bearerToken) {
     try {
         const payload = decodeJwt(bearerToken);
         if (!payload) return 'Unknown';
-        return payload.un || payload.username || payload.usn || 'Unknown';
+        return payload.un || payload.usn || payload.username || 'Unknown';
     } catch (e) {
         return 'Unknown';
     }
@@ -278,8 +294,6 @@ async function nakamaRefreshSession(refreshTokenValue) {
 // This creates a FRESH session using the device ID from the JWT.
 // Works even when both bearer AND refresh tokens are fully expired.
 async function nakamaDeviceAuth(deviceId) {
-    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
-
     // Try multiple endpoint paths and URLs
     const paths = [
         '/v2/account/session/authenticate/device',
@@ -287,16 +301,119 @@ async function nakamaDeviceAuth(deviceId) {
         '/v2/console/session/authenticate/device'
     ];
 
+    // Try with Basic auth (server key) and also with empty bearer
+    const authHeaders = [
+        { 'Authorization': 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64') },
+        { 'Authorization': 'Bearer ' + deviceId } // some servers auth with the device ID itself
+    ];
+
+    let lastError = 'none';
+
+    for (const url of API_URLS) {
+        for (const endpointPath of paths) {
+            for (const authHeader of authHeaders) {
+                const fullUrl = `${url}${endpointPath}`;
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+                    // Nakama ApiAccountDevice: { id, create }
+                    const body = JSON.stringify({ id: deviceId, create: true });
+
+                    console.log(`[TMC] 🎮 DeviceAuth POST ${fullUrl}`);
+
+                    const response = await fetch(fullUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
+                            ...authHeader
+                        },
+                        body: body,
+                        signal: controller.signal
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    console.log(`[TMC] 🎮 DeviceAuth response: HTTP ${response.status} from ${fullUrl} (auth: ${authHeader['Authorization'].substring(0, 10)}...)`);
+
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        console.log(`[TMC] 🎮 DeviceAuth non-JSON: ${text.substring(0, 200)}`);
+                        lastError = `HTTP ${response.status} - non-JSON`;
+                        continue;
+                    }
+
+                    const data = await response.json();
+                    console.log(`[TMC] 🎮 DeviceAuth data: ${JSON.stringify(data).substring(0, 300)}`);
+
+                    if (response.status === 404) {
+                        lastError = `HTTP 404 - Not Found`;
+                        continue; // try next auth/path/url
+                    }
+
+                    if (response.status === 403) {
+                        lastError = `HTTP 403 - Forbidden (${JSON.stringify(data).substring(0, 100)})`;
+                        continue; // try different auth header
+                    }
+
+                    if (response.status === 401) {
+                        lastError = `HTTP 401 - Unauthorized`;
+                        continue; // try different auth header
+                    }
+
+                    if ((response.status === 200 || response.status === 201) && data) {
+                        const newBearer = data.token || data.access_token || null;
+                        const newRefresh = data.refresh_token || null;
+                        if (newBearer) {
+                            const newExpiry = getTokenExpiryMs(newBearer);
+                            console.log(`[TMC] ✅ Device auth SUCCESS via ${fullUrl}!`);
+                            return {
+                                success: true,
+                                bearer: newBearer,
+                                refresh: newRefresh,
+                                expiresAt: newExpiry,
+                                created: data.created || false
+                            };
+                        }
+                        lastError = 'Response missing token';
+                        continue;
+                    }
+
+                    lastError = `HTTP ${response.status}`;
+                    continue;
+                } catch (err) {
+                    console.log(`[TMC] 🎮 DeviceAuth exception on ${fullUrl}: ${err.message}`);
+                    lastError = err.message;
+                    continue;
+                }
+            }
+        }
+    }
+
+    return { success: false, error: `All endpoints exhausted. Last: ${lastError}` };
+}
+
+// --- NAKAMA CUSTOM AUTH (POST /v2/account/session/authenticate/custom) ---
+// Uses the authID from the JWT as a custom ID. Alternative to device auth.
+async function nakamaCustomAuth(authId) {
+    const paths = [
+        '/v2/account/session/authenticate/custom',
+        '/v2/account/authenticate/custom'
+    ];
+
     for (const url of API_URLS) {
         for (const endpointPath of paths) {
             const fullUrl = `${url}${endpointPath}`;
             try {
+                const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-                const body = JSON.stringify({ id: deviceId, create: true });
+                const body = JSON.stringify({ id: authId, create: true });
 
-                console.log(`[TMC] 🎮 DeviceAuth POST ${fullUrl}`);
+                console.log(`[TMC] 🎯 CustomAuth POST ${fullUrl}`);
 
                 const response = await fetch(fullUrl, {
                     method: 'POST',
@@ -311,21 +428,19 @@ async function nakamaDeviceAuth(deviceId) {
 
                 clearTimeout(timeoutId);
 
-                console.log(`[TMC] 🎮 DeviceAuth response: HTTP ${response.status} from ${fullUrl}`);
+                console.log(`[TMC] 🎯 CustomAuth response: HTTP ${response.status} from ${fullUrl}`);
 
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
                     const text = await response.text();
-                    console.log(`[TMC] 🎮 DeviceAuth non-JSON: ${text.substring(0, 200)}`);
-                    if (response.status === 404) continue; // try next path
-                    return { success: false, error: `HTTP ${response.status} - ${text.substring(0, 100)}` };
+                    console.log(`[TMC] 🎯 CustomAuth non-JSON: ${text.substring(0, 200)}`);
+                    continue;
                 }
 
                 const data = await response.json();
-                console.log(`[TMC] 🎮 DeviceAuth data: ${JSON.stringify(data).substring(0, 300)}`);
+                console.log(`[TMC] 🎯 CustomAuth data: ${JSON.stringify(data).substring(0, 300)}`);
 
-                if (response.status === 404) {
-                    console.log(`[TMC] 🎮 404 - trying next endpoint...`);
+                if (response.status === 404 || response.status === 403 || response.status === 401) {
                     continue;
                 }
 
@@ -334,7 +449,7 @@ async function nakamaDeviceAuth(deviceId) {
                     const newRefresh = data.refresh_token || null;
                     if (newBearer) {
                         const newExpiry = getTokenExpiryMs(newBearer);
-                        console.log(`[TMC] ✅ Device auth successful via ${fullUrl}! Session created`);
+                        console.log(`[TMC] ✅ Custom auth SUCCESS via ${fullUrl}!`);
                         return {
                             success: true,
                             bearer: newBearer,
@@ -343,22 +458,18 @@ async function nakamaDeviceAuth(deviceId) {
                             created: data.created || false
                         };
                     }
-                    return { success: false, error: 'Response missing token', data: JSON.stringify(data).substring(0, 200) };
-                } else {
-                    return { success: false, status: response.status, error: JSON.stringify(data).substring(0, 200) };
                 }
             } catch (err) {
-                console.log(`[TMC] 🎮 DeviceAuth exception on ${fullUrl}: ${err.message}`);
-                if (err.name === 'AbortError') continue; // timeout, try next
-                return { success: false, error: err.message };
+                console.log(`[TMC] 🎯 CustomAuth exception: ${err.message}`);
+                continue;
             }
         }
     }
 
-    return { success: false, error: 'All device auth endpoints exhausted' };
+    return { success: false, error: 'All custom auth endpoints exhausted' };
 }
 
-// --- FULL 3-TIER LOGIN: bearer -> refresh -> device auth ---
+// --- FULL LOGIN: bearer -> refresh -> device auth -> custom auth ---
 async function fullLogin(tokenObj, label) {
     label = label || '[Login]';
 
@@ -427,13 +538,38 @@ async function fullLogin(tokenObj, label) {
             }
             return { success: true, method: 'device_auth', account: null };
         } else {
-            console.log(`${label} ❌ Tier 3 FAILED (HTTP ${deviceResult.status || 'N/A'}): ${deviceResult.error}`);
+            console.log(`${label} ❌ Tier 3 FAILED: ${deviceResult.error}`);
         }
     } else {
         console.log(`${label} ❌ Could not extract device ID from token`);
     }
 
-    console.log(`${label} 🔴 ALL 3 TIERS FAILED`);
+    // === TIER 4: Extract authID and do custom auth ===
+    const authId = extractAuthIdFromToken(tokenObj.bearer);
+    if (authId) {
+        console.log(`${label} Tier 4: Custom auth with ID: ${authId}`);
+        const customResult = await nakamaCustomAuth(authId);
+        if (customResult.success) {
+            tokenObj.bearer = customResult.bearer;
+            if (customResult.refresh) tokenObj.refresh = customResult.refresh;
+            tokenObj.expiresAt = customResult.expiresAt;
+            console.log(`${label} ✅ Tier 4 SUCCESS - Fresh session created!`);
+
+            const accCheck = await fetchAccountFromNakama(customResult.bearer);
+            if (accCheck.valid) {
+                tokenObj.accountInfo = accCheck;
+                console.log(`${label} 👤 ${accCheck.username} (${accCheck.userId})`);
+                return { success: true, method: 'custom_auth', account: accCheck };
+            }
+            return { success: true, method: 'custom_auth', account: null };
+        } else {
+            console.log(`${label} ❌ Tier 4 FAILED: ${customResult.error}`);
+        }
+    } else {
+        console.log(`${label} ❌ Could not extract authID from token`);
+    }
+
+    console.log(`${label} 🔴 ALL 4 TIERS FAILED`);
     return { success: false, method: 'none', account: null };
 }
 
@@ -623,7 +759,7 @@ function startAutoRefresh() {
     console.log('[TMC] ================================');
     console.log('[TMC] 🔄 AUTO-REFRESH STARTED');
     console.log('[TMC] ⏳ Tokens refresh/re-auth BEFORE they expire!');
-    console.log('[TMC] Tier 1: Bearer → Tier 2: Refresh → Tier 3: Device Auth');
+    console.log('[TMC] Tier 1: Bearer → Tier 2: Refresh → Tier 3: Device Auth → Tier 4: Custom Auth');
     console.log('[TMC] ================================');
 
     isRefreshing = false;
