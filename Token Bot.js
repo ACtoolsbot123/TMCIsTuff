@@ -93,7 +93,7 @@ function getTokenExpiryMs(token) {
 
 function formatRemainingTime(expiresAt) {
     const diff = expiresAt - Date.now();
-    if (diff <= 0) return 'EXPIRED';
+    if (diff <= 0) return 'Expired';
     const seconds = Math.floor(diff / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
@@ -106,22 +106,13 @@ function formatRemainingTime(expiresAt) {
 
 function humanExpiry(expiresAt) {
     const diff = expiresAt - Date.now();
-    if (diff <= 0) return 'EXPIRED';
+    if (diff <= 0) return 'Expired';
     return `${formatRemainingTime(expiresAt)}`;
 }
 
 function isTokenExpired(tokenObj) {
     if (!tokenObj || !tokenObj.bearer) return true;
     return Date.now() >= getTokenExpiryMs(tokenObj.bearer);
-}
-
-function generateGenerationId() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let id = 'GEN-';
-    for (let i = 0; i < 6; i++) {
-        id += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return id;
 }
 
 // --- CLEANUP STUCK GENERATIONS ---
@@ -188,7 +179,7 @@ async function validateSteamToken(bearerToken, retries = 3) {
         status: expired ? 401 : 200,
         data: { valid: !expired },
         expiresAt: expiresAt,
-        message: expired ? 'EXPIRED' : `Valid for ${formatRemainingTime(expiresAt)}`
+        message: expired ? 'Expired' : `${formatRemainingTime(expiresAt)}`
     };
 }
 
@@ -294,9 +285,9 @@ async function refreshToken(refreshTk) {
                             refresh: newRefresh,
                             addedAt: Date.now(),
                             expiresAt: newExpiry,
-                            id: oldToken.id || generateGenerationId(),
-                            userId: oldToken.userId || 'system',
-                            username: oldToken.username || 'System'
+                            id: oldToken.id,
+                            userId: oldToken.userId,
+                            username: oldToken.username
                         };
                         tokenStock[0] = newToken;
                     } else {
@@ -305,7 +296,7 @@ async function refreshToken(refreshTk) {
                             refresh: newRefresh,
                             addedAt: Date.now(),
                             expiresAt: newExpiry,
-                            id: generateGenerationId(),
+                            id: '',
                             userId: 'system',
                             username: 'System'
                         });
@@ -517,8 +508,6 @@ async function processTokenGeneration(interaction) {
             tokenObj.expiresAt = validationResult.expiresAt;
         }
         
-        const genId = generateGenerationId();
-        tokenObj.id = genId;
         tokenObj.userId = interaction.user.id;
         tokenObj.username = interaction.user.tag;
         
@@ -537,8 +526,7 @@ async function processTokenGeneration(interaction) {
         const tokenData = {
             token: {
                 bearer: tokenObj.bearer,
-                refresh_token: tokenObj.refresh,
-                generation_id: genId
+                refresh_token: tokenObj.refresh
             }
         };
         
@@ -550,11 +538,10 @@ async function processTokenGeneration(interaction) {
             .setDescription(
                 `✅ Token generated!\n\n` +
                 `📁 token.json attached\n\n` +
-                `🆔 ID: \`${genId}\`\n` +
                 `⏳ Status: **${expiryText}**`
             )
             .setColor(tokenExpired ? 0xED4245 : 0x2ECC71)
-            .setFooter({ text: `TMC Token Gen` });
+            .setFooter({ text: `TMC Gen` });
         
         try {
             await interaction.user.send({
@@ -564,7 +551,7 @@ async function processTokenGeneration(interaction) {
             
             activeGenerations.delete(userId);
             return interaction.editReply({
-                content: `✅ Token sent to DMs!\n🆔 \`${genId}\`\n⏳ ${expiryText}\n📦 ${tokenStock.length} remaining`
+                content: `✅ Token sent!\n⏳ ${expiryText}`
             });
         } catch (err) {
             console.error('[TMC] DM Error:', err);
@@ -574,11 +561,10 @@ async function processTokenGeneration(interaction) {
                 .setDescription(
                     `⚠️ Could not send DM!\n\n` +
                     `📁 token.json attached\n\n` +
-                    `🆔 ID: \`${genId}\`\n` +
                     `⏳ Status: **${expiryText}**`
                 )
                 .setColor(0xFEE75C)
-                .setFooter({ text: `TMC Token Gen` });
+                .setFooter({ text: `TMC Gen` });
             
             return interaction.editReply({
                 embeds: [fallbackEmbed],
@@ -604,8 +590,8 @@ const commandsData = [
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     new SlashCommandBuilder()
-        .setName('dashboard')
-        .setDescription('Token Generator panel'),
+        .setName('gen')
+        .setDescription('Generate a token'),
 ].map(command => command.toJSON());
 
 // --- READY EVENT ---
@@ -664,15 +650,15 @@ client.on('interactionCreate', async interaction => {
         if (interaction.isChatInputCommand()) {
             const { commandName } = interaction;
 
-            // --- DASHBOARD COMMAND ---
-            if (commandName === 'dashboard') {
+            // --- GEN COMMAND ---
+            if (commandName === 'gen') {
                 const embed = new EmbedBuilder()
                     .setDescription(
-                        `**TMC Token Gen**\n\n` +
-                        `Click the button below to generate your token.`
+                        `**TMC Gen**\n\n` +
+                        `Click below to generate your token.`
                     )
                     .setColor(0x5865F2)
-                    .setFooter({ text: `TMC Token Gen` });
+                    .setFooter({ text: `TMC Gen` });
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
@@ -736,7 +722,7 @@ client.on('interactionCreate', async interaction => {
                     
                     if (!bearer || !refresh) {
                         return interaction.editReply({
-                            content: '❌ Error: Both Bearer and Refresh tokens are required.'
+                            content: '❌ Error: Both tokens required.'
                         });
                     }
 
@@ -744,7 +730,7 @@ client.on('interactionCreate', async interaction => {
                     
                     if (!validation.valid) {
                         return interaction.editReply({
-                            content: `❌ Invalid token! Status: ${validation.message}`
+                            content: `❌ Invalid token: ${validation.message}`
                         });
                     }
                     
