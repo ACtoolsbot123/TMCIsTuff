@@ -64,7 +64,7 @@ function processQueue(error, token = null) {
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
   "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI0Y2VhZTgxZC1jNDIzLTQ4NzItYjI5MC03OGVhYmI1YTQ2OWEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjY5OGQ5MzMzODAwNTQ5M2I4NmJkMzVjZWJmZWM2Y2RjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1Mjk3MjQsImlhdCI6MTc4ODUyNjEyNH0.hgIvyz5QmtvQLPZ9i3tF09NxXCiDXD8dsNXAeqVdy5w",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI0Y2VhZTgxZC1jNDIzLTQ4NzItYjI5MC03OGVhYmI1YTQ2OWEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjY5OGQ5MzMzODAwNTQ5M2I4NmJkMzVjZWJmZWM2Y2RjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NDc3MjQsImlhdCI6MTc4ODUyNjEyNH0.KeUfmYz1LOL9cyHLMnJOH5zr5-NQusSdImgjZXUaW-Y"
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI0Y2VhZTgxZC1jNDIzLTQ4NzItYjI5MC03OGVhYmI1YTQ2OWEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjY5OGQ5MzMzODAwNTQ5M2I4NmJkMzVjZWJmZWM2Y2RjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NDc3MjQsImlhdCI6MTc4ODUyNjEyNH0.KeUfmYz1LOL9cyHLMnJOH5zr5-NQusSdImgjZXUaW-Y
 };
 
 let tokenStock = [];
@@ -385,25 +385,15 @@ async function refreshTokenInStock() {
     console.log(`[TMC] Stock count: ${tokenStock.length}`);
 }
 
-// --- START AUTO-REFRESH ---
-const REFRESH_BEFORE_MS = 5 * 60 * 1000;
-const MIN_REFRESH_MS = 60 * 1000;
-const MAX_REFRESH_MS = 30 * 60 * 1000;
-
+// --- START AUTO-REFRESH (Every 3 minutes) ---
 function scheduleNextRefresh() {
     if (refreshInterval) {
         clearTimeout(refreshInterval);
         refreshInterval = null;
     }
 
-    let delay = MAX_REFRESH_MS;
-
-    if (tokenStock.length > 0) {
-        const remaining = tokenStock[0].expiresAt - Date.now();
-        const untilRefresh = remaining - REFRESH_BEFORE_MS;
-        delay = Math.max(MIN_REFRESH_MS, Math.min(MAX_REFRESH_MS, untilRefresh));
-        if (delay <= 0) delay = MIN_REFRESH_MS;
-    }
+    // ALWAYS refresh every 3 minutes (180,000 ms)
+    const delay = 3 * 60 * 1000;
 
     refreshInterval = setTimeout(async () => {
         refreshInterval = null;
@@ -425,7 +415,7 @@ function scheduleNextRefresh() {
 function startAutoRefresh() {
     console.log('[TMC] ================================');
     console.log('[TMC] 🔄 AUTO-REFRESH STARTED');
-    console.log('[TMC] ⏳ Tokens refresh BEFORE they expire!');
+    console.log('[TMC] ⏳ Refreshing every 3 minutes');
     console.log('[TMC] ================================');
 
     isRefreshing = false;
@@ -439,7 +429,7 @@ function startAutoRefresh() {
     }, 5000);
 }
 
-// --- PROCESS TOKEN GENERATION - NO COOLDOWN ---
+// --- PROCESS TOKEN GENERATION ---
 async function processTokenGeneration(interaction) {
     const userId = interaction.user.id;
     
@@ -754,7 +744,11 @@ client.on('interactionCreate', async interaction => {
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', bot: 'online', timestamp: Date.now() }));
+        res.end(JSON.stringify({ 
+            status: 'ok', 
+            bot: client.user ? 'online' : 'offline', 
+            timestamp: Date.now() 
+        }));
         return;
     }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -764,6 +758,11 @@ const server = http.createServer((req, res) => {
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`[TMC] HTTP server running on port ${PORT}`);
+});
+
+// Handle server errors
+server.on('error', (err) => {
+    console.error('[TMC] Server error:', err);
 });
 
 // --- LOGIN WITH RETRY ---
@@ -804,6 +803,11 @@ if (!process.env.DISCORD_TOKEN) {
     });
 }
 
+// --- KEEP BOT ALIVE ---
+// Prevent the process from exiting
+process.stdin.resume();
+
+// Handle uncaught errors
 process.on('unhandledRejection', (reason) => {
     console.error('[TMC] Unhandled Rejection:', reason);
 });
@@ -811,3 +815,8 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (err) => {
     console.error('[TMC] Uncaught Exception:', err);
 });
+
+// Keep-alive ping every minute
+setInterval(() => {
+    console.log('[TMC] ⏳ Bot is still alive...');
+}, 60000);
