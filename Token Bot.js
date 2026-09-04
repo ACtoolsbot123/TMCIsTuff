@@ -39,7 +39,12 @@ const client = new Client({
 // --- API CONFIGURATION ---
 const NAKAMA_SERVER = 'https://animalcompany.us-east1.nakamacloud.io';
 const NAKAMA_SERVER_KEY = '6URuTSlDKKfYbuDW';
-const API_URLS = [ NAKAMA_SERVER ];
+// Nakama default API port is 7350 — try multiple URLs
+const API_URLS = [
+    'https://animalcompany.us-east1.nakamacloud.io',
+    'https://animalcompany.us-east1.nakamacloud.io:7350',
+    'http://animalcompany.us-east1.nakamacloud.io:7350'
+];
 
 let ACTIVE_API_URL = API_URLS[0];
 let apiWorking = false;
@@ -146,179 +151,211 @@ function extractUsernameFromToken(bearerToken) {
 }
 
 // --- NAKAMA ACCOUNT FETCH (GET /v2/account with bearer) ---
-async function fetchAccountFromNakama(bearerToken, apiUrl) {
-    const url = apiUrl || ACTIVE_API_URL;
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+async function fetchAccountFromNakama(bearerToken) {
+    for (const url of API_URLS) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        console.log(`[TMC] 📡 AccountFetch GET ${url}/v2/account`);
+            const accountUrl = `${url}/v2/account`;
+            console.log(`[TMC] 📡 AccountFetch GET ${accountUrl}`);
 
-        const response = await fetch(`${url}/v2/account`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${bearerToken}`,
-                'Content-Type': 'application/json',
-                'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-            },
-            signal: controller.signal
-        });
+            const response = await fetch(accountUrl, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${bearerToken}`,
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
+                },
+                signal: controller.signal
+            });
 
-        clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-        console.log(`[TMC] 📡 AccountFetch response: HTTP ${response.status}`);
+            console.log(`[TMC] 📡 AccountFetch response: HTTP ${response.status} from ${url}`);
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.log(`[TMC] 📡 AccountFetch non-JSON: ${text.substring(0, 300)}`);
-            return { valid: false, status: response.status, error: `HTTP ${response.status} - Non-JSON: ${text.substring(0, 150)}` };
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.log(`[TMC] 📡 AccountFetch non-JSON: ${text.substring(0, 200)}`);
+                continue; // try next URL
+            }
+
+            const data = await response.json();
+
+            if (response.status === 200 && data) {
+                return {
+                    valid: true,
+                    status: 200,
+                    username: data.username || 'Unknown',
+                    userId: data.user_id || data.id || '',
+                    wallet: data.wallet || {},
+                    devices: data.devices || [],
+                    customId: data.custom_id || '',
+                    steamId: data.steam_id || '',
+                    createdAt: data.created_at || 0,
+                    updatedAt: data.updated_at || 0
+                };
+            } else {
+                console.log(`[TMC] 📡 AccountFetch error body: ${JSON.stringify(data).substring(0, 200)}`);
+                return { valid: false, status: response.status, error: `HTTP ${response.status}: ${JSON.stringify(data).substring(0, 150)}` };
+            }
+        } catch (err) {
+            console.log(`[TMC] 📡 AccountFetch exception: ${err.message}`);
+            continue;
         }
-
-        const data = await response.json();
-
-        if (response.status === 200 && data) {
-            return {
-                valid: true,
-                status: 200,
-                username: data.username || 'Unknown',
-                userId: data.user_id || data.id || '',
-                wallet: data.wallet || {},
-                devices: data.devices || [],
-                customId: data.custom_id || '',
-                steamId: data.steam_id || '',
-                createdAt: data.created_at || 0,
-                updatedAt: data.updated_at || 0
-            };
-        } else {
-            console.log(`[TMC] 📡 AccountFetch error body: ${JSON.stringify(data).substring(0, 300)}`);
-            return { valid: false, status: response.status, error: `HTTP ${response.status}: ${JSON.stringify(data).substring(0, 150)}` };
-        }
-    } catch (err) {
-        console.log(`[TMC] 📡 AccountFetch exception: ${err.message}`);
-        return { valid: false, status: 0, error: err.message };
     }
+    return { valid: false, status: 0, error: 'All API URLs exhausted for account fetch' };
 }
 
 // --- NAKAMA SESSION REFRESH (POST /v2/account/session/refresh) ---
-async function nakamaRefreshSession(refreshTokenValue, apiUrl) {
-    const url = apiUrl || ACTIVE_API_URL;
-    try {
-        const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+async function nakamaRefreshSession(refreshTokenValue) {
+    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+    const body = JSON.stringify({ token: refreshTokenValue });
 
-        // Nakama ApiSessionRefreshRequest: { token, vars }
-        const body = JSON.stringify({ token: refreshTokenValue });
+    for (const url of API_URLS) {
+        const refreshUrl = `${url}/v2/account/session/refresh`;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        console.log(`[TMC] 🔄 Refresh POST ${url}/v2/account/session/refresh`);
+            console.log(`[TMC] 🔄 Refresh POST ${refreshUrl}`);
 
-        const response = await fetch(`${url}/v2/account/session/refresh`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': serverKeyAuth,
-                'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-            },
-            body: body,
-            signal: controller.signal
-        });
+            const response = await fetch(refreshUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': serverKeyAuth,
+                    'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
+                },
+                body: body,
+                signal: controller.signal
+            });
 
-        clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-        console.log(`[TMC] 🔄 Refresh response: HTTP ${response.status}`);
+            console.log(`[TMC] 🔄 Refresh response: HTTP ${response.status} from ${refreshUrl}`);
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.log(`[TMC] 🔄 Refresh non-JSON body: ${text.substring(0, 300)}`);
-            return { success: false, error: `HTTP ${response.status} - Non-JSON: ${text.substring(0, 150)}` };
-        }
-
-        const data = await response.json();
-        console.log(`[TMC] 🔄 Refresh data: ${JSON.stringify(data).substring(0, 300)}`);
-
-        let newBearer = data.token || data.access_token || data.bearer || null;
-        let newRefresh = data.refresh_token || refreshTokenValue;
-
-        if ((response.status === 200 || response.status === 201) && newBearer) {
-            const newExpiry = getTokenExpiryMs(newBearer);
-            if (newExpiry <= Date.now()) {
-                return { success: false, error: 'Refreshed token already expired' };
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.log(`[TMC] 🔄 Refresh non-JSON: ${text.substring(0, 200)}`);
+                continue; // try next URL
             }
-            return { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry };
-        } else {
-            return { success: false, status: response.status, error: JSON.stringify(data).substring(0, 200) };
+
+            const data = await response.json();
+            console.log(`[TMC] 🔄 Refresh data: ${JSON.stringify(data).substring(0, 300)}`);
+
+            let newBearer = data.token || data.access_token || data.bearer || null;
+            let newRefresh = data.refresh_token || refreshTokenValue;
+
+            if ((response.status === 200 || response.status === 201) && newBearer) {
+                const newExpiry = getTokenExpiryMs(newBearer);
+                if (newExpiry <= Date.now()) {
+                    console.log(`[TMC] 🔄 Refreshed token already expired, trying next URL...`);
+                    continue;
+                }
+                ACTIVE_API_URL = url;
+                return { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry };
+            } else {
+                // 401 = token dead, don't try other URLs for this error
+                if (response.status === 401) {
+                    return { success: false, status: 401, error: JSON.stringify(data).substring(0, 200) };
+                }
+                // Other errors, try next URL
+                continue;
+            }
+        } catch (err) {
+            console.log(`[TMC] 🔄 Refresh exception on ${refreshUrl}: ${err.message}`);
+            continue;
         }
-    } catch (err) {
-        console.log(`[TMC] 🔄 Refresh exception: ${err.message}`);
-        return { success: false, error: err.message };
     }
+
+    return { success: false, error: 'All refresh URLs exhausted' };
 }
 
 // --- NAKAMA DEVICE AUTH (POST /v2/account/session/authenticate/device) ---
 // This creates a FRESH session using the device ID from the JWT.
 // Works even when both bearer AND refresh tokens are fully expired.
-async function nakamaDeviceAuth(deviceId, apiUrl) {
-    const url = apiUrl || ACTIVE_API_URL;
-    try {
-        const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+async function nakamaDeviceAuth(deviceId) {
+    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
 
-        // Nakama ApiAccountDevice: { id }
-        const body = JSON.stringify({ id: deviceId });
+    // Try multiple endpoint paths and URLs
+    const paths = [
+        '/v2/account/session/authenticate/device',
+        '/v2/account/authenticate/device',
+        '/v2/console/session/authenticate/device'
+    ];
 
-        console.log(`[TMC] 🎮 DeviceAuth POST ${url}/v2/account/session/authenticate/device`);
-        console.log(`[TMC] 🎮 Device ID: ${deviceId}`);
+    for (const url of API_URLS) {
+        for (const endpointPath of paths) {
+            const fullUrl = `${url}${endpointPath}`;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-        const response = await fetch(`${url}/v2/account/session/authenticate/device`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': serverKeyAuth,
-                'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-            },
-            body: body,
-            signal: controller.signal
-        });
+                const body = JSON.stringify({ id: deviceId, create: true });
 
-        clearTimeout(timeoutId);
+                console.log(`[TMC] 🎮 DeviceAuth POST ${fullUrl}`);
 
-        console.log(`[TMC] 🎮 DeviceAuth response: HTTP ${response.status}`);
+                const response = await fetch(fullUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': serverKeyAuth,
+                        'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
+                    },
+                    body: body,
+                    signal: controller.signal
+                });
 
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.log(`[TMC] 🎮 DeviceAuth non-JSON body: ${text.substring(0, 300)}`);
-            return { success: false, error: `HTTP ${response.status} - Non-JSON: ${text.substring(0, 150)}` };
-        }
+                clearTimeout(timeoutId);
 
-        const data = await response.json();
-        console.log(`[TMC] 🎮 DeviceAuth data: ${JSON.stringify(data).substring(0, 300)}`);
+                console.log(`[TMC] 🎮 DeviceAuth response: HTTP ${response.status} from ${fullUrl}`);
 
-        if ((response.status === 200 || response.status === 201) && data) {
-            const newBearer = data.token || data.access_token || null;
-            const newRefresh = data.refresh_token || null;
-            if (newBearer) {
-                const newExpiry = getTokenExpiryMs(newBearer);
-                console.log(`[TMC] ✅ Device auth successful! Session created`);
-                return {
-                    success: true,
-                    bearer: newBearer,
-                    refresh: newRefresh,
-                    expiresAt: newExpiry,
-                    created: data.created || false
-                };
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.log(`[TMC] 🎮 DeviceAuth non-JSON: ${text.substring(0, 200)}`);
+                    if (response.status === 404) continue; // try next path
+                    return { success: false, error: `HTTP ${response.status} - ${text.substring(0, 100)}` };
+                }
+
+                const data = await response.json();
+                console.log(`[TMC] 🎮 DeviceAuth data: ${JSON.stringify(data).substring(0, 300)}`);
+
+                if (response.status === 404) {
+                    console.log(`[TMC] 🎮 404 - trying next endpoint...`);
+                    continue;
+                }
+
+                if ((response.status === 200 || response.status === 201) && data) {
+                    const newBearer = data.token || data.access_token || null;
+                    const newRefresh = data.refresh_token || null;
+                    if (newBearer) {
+                        const newExpiry = getTokenExpiryMs(newBearer);
+                        console.log(`[TMC] ✅ Device auth successful via ${fullUrl}! Session created`);
+                        return {
+                            success: true,
+                            bearer: newBearer,
+                            refresh: newRefresh,
+                            expiresAt: newExpiry,
+                            created: data.created || false
+                        };
+                    }
+                    return { success: false, error: 'Response missing token', data: JSON.stringify(data).substring(0, 200) };
+                } else {
+                    return { success: false, status: response.status, error: JSON.stringify(data).substring(0, 200) };
+                }
+            } catch (err) {
+                console.log(`[TMC] 🎮 DeviceAuth exception on ${fullUrl}: ${err.message}`);
+                if (err.name === 'AbortError') continue; // timeout, try next
+                return { success: false, error: err.message };
             }
-            return { success: false, error: 'Response missing token', data: JSON.stringify(data).substring(0, 200) };
-        } else {
-            return { success: false, status: response.status, error: JSON.stringify(data).substring(0, 200) };
         }
-    } catch (err) {
-        console.log(`[TMC] 🎮 DeviceAuth exception: ${err.message}`);
-        return { success: false, error: err.message };
     }
+
+    return { success: false, error: 'All device auth endpoints exhausted' };
 }
 
 // --- FULL 3-TIER LOGIN: bearer -> refresh -> device auth ---
@@ -425,12 +462,15 @@ async function findWorkingApiUrl() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             
-            const response = await fetch(url, {
-                method: 'GET',
+            // Test with a session refresh endpoint (doesn't need auth)
+            const response = await fetch(`${url}/v2/account/session/refresh`, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64'),
                     'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
                 },
+                body: JSON.stringify({ token: 'test' }),
                 signal: controller.signal
             });
             
@@ -438,12 +478,12 @@ async function findWorkingApiUrl() {
             
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
-                console.log(`[TMC] ✅ Found working API: ${url}`);
+                console.log(`[TMC] ✅ Found working API: ${url} (HTTP ${response.status})`);
                 ACTIVE_API_URL = url;
                 apiWorking = true;
                 return url;
             } else {
-                console.log(`[TMC] ❌ Not a JSON API: ${url}`);
+                console.log(`[TMC] ❌ Not a JSON API: ${url} (status ${response.status})`);
             }
         } catch (err) {
             console.log(`[TMC] ❌ Failed: ${url} - ${err.message}`);
