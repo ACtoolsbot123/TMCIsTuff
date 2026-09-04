@@ -68,7 +68,6 @@ let DEFAULT_TOKEN = {
 };
 
 let tokenStock = [];
-const cooldowns = new Map();
 const activeGenerations = new Map();
 let refreshInterval = null;
 
@@ -440,25 +439,11 @@ function startAutoRefresh() {
     }, 5000);
 }
 
-// --- PROCESS TOKEN GENERATION ---
+// --- PROCESS TOKEN GENERATION - NO COOLDOWN ---
 async function processTokenGeneration(interaction) {
     const userId = interaction.user.id;
-    const member = interaction.member;
     
     await interaction.deferReply({ flags: 64 });
-    
-    const cooldownKey = `public_${userId}`;
-    if (cooldowns.has(cooldownKey)) {
-        const cooldownEnd = cooldowns.get(cooldownKey);
-        if (Date.now() < cooldownEnd) {
-            const remaining = cooldownEnd - Date.now();
-            const minutes = Math.floor(remaining / 60000);
-            const seconds = Math.floor((remaining % 60000) / 1000);
-            return interaction.editReply({
-                content: `⏳ Please wait ${minutes}m ${seconds}s`
-            });
-        }
-    }
     
     if (activeGenerations.has(userId)) {
         const startTime = activeGenerations.get(userId);
@@ -513,8 +498,6 @@ async function processTokenGeneration(interaction) {
         
         tokenStock.shift();
         tokenStock.push(tokenObj);
-        
-        cooldowns.set(`public_${userId}`, Date.now() + 5 * 60 * 1000);
         
         await interaction.editReply({
             content: '⏳ Sending...'
@@ -590,8 +573,8 @@ const commandsData = [
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     new SlashCommandBuilder()
-        .setName('gen')
-        .setDescription('Generate a token'),
+        .setName('dashboard')
+        .setDescription('Token Generator panel'),
 ].map(command => command.toJSON());
 
 // --- READY EVENT ---
@@ -650,8 +633,8 @@ client.on('interactionCreate', async interaction => {
         if (interaction.isChatInputCommand()) {
             const { commandName } = interaction;
 
-            // --- GEN COMMAND ---
-            if (commandName === 'gen') {
+            // --- DASHBOARD COMMAND ---
+            if (commandName === 'dashboard') {
                 const embed = new EmbedBuilder()
                     .setDescription(
                         `**TMC Gen**\n\n` +
@@ -663,7 +646,7 @@ client.on('interactionCreate', async interaction => {
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
                         .setCustomId('gen_public')
-                        .setLabel('Generate Token')
+                        .setLabel('Gen Token')
                         .setStyle(ButtonStyle.Success)
                         .setEmoji('🔑')
                 );
