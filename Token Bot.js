@@ -46,15 +46,15 @@ let ACTIVE_API_URL = API_URLS[0];
 let apiWorking = false;
 let isRefreshing = false;
 let failedQueue = [];
-let refreshAttempts = 0;
 let tokenStock = [];
 const cooldowns = new Map();
 const activeGenerations = new Map();
 let refreshInterval = null;
 
+// --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5MjMyZmY2My00NGFjLTRiOWYtYmZiNy0wMGY4NDVkNTliYjIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjJlMzgxYzVjMWJjMTQ1YzU5OTY0Yjk1OTJlNmJjYTUwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1Mzk3OTQsImlhdCI6MTc4ODUzNjE5NH0.01Yzh3cUk-yZKUBDqXKBllzyNXatrNA1r5s2QlJvQVY",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5MjMyZmY2My00NGFjLTRiOWYtYmZiNy0wMGY4NDVkNTliYjIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjJlMzgxYzVjMWJjMTQ1YzU5OTY0Yjk1OTJlNmJjYTUwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NTc3OTQsImlhdCI6MTc4ODUzNjE5NH0.mFjT0Fe9Zv1tQTS8QU-TqcmzFiLwsaf3N4QPEAXDKoM"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIxN2ZmMmM5Yi1mYmE5LTQ3NjgtOGJiZC0yYjU4YzYxZTBjZTIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImJiOTNmYmUyNDBlODRmN2VhZTIyYzM4ZGQ4MGViODkzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NDgyNTIsImlhdCI6MTc4ODU0NDY1Mn0.JM15u2Z9CBdTCFZGPJCbEN4lsfij--in7iWaDFSTEsM",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIxN2ZmMmM5Yi1mYmE5LTQ3NjgtOGJiZC0yYjU4YzYxZTBjZTIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImJiOTNmYmUyNDBlODRmN2VhZTIyYzM4ZGQ4MGViODkzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NjYyNTIsImlhdCI6MTc4ODU0NDY1Mn0.xyrQCXAjxzEZN5-rTNndDtwnupYchZZ7vwRDY1Z9KTE"
 };
 
 // --- JWT HELPERS ---
@@ -93,11 +93,6 @@ function humanExpiry(expiresAt) {
     return `${formatRemainingTime(expiresAt)}`;
 }
 
-function isTokenExpired(tokenObj) {
-    if (!tokenObj || !tokenObj.bearer) return true;
-    return Date.now() >= getTokenExpiryMs(tokenObj.bearer);
-}
-
 function processQueue(error, token = null) {
     failedQueue.forEach(prom => {
         if (error) prom.reject(error);
@@ -106,7 +101,7 @@ function processQueue(error, token = null) {
     failedQueue = [];
 }
 
-// --- CLEANUP ---
+// --- CLEANUP STUCK GENERATIONS ---
 setInterval(() => {
     const now = Date.now();
     let cleaned = 0;
@@ -119,7 +114,7 @@ setInterval(() => {
     if (cleaned > 0) console.log(`[TMC] Cleaned ${cleaned} stuck generations`);
 }, 30000);
 
-// --- FIND API ---
+// --- FIND WORKING API URL ---
 async function findWorkingApiUrl() {
     for (const url of API_URLS) {
         try {
@@ -143,7 +138,7 @@ async function findWorkingApiUrl() {
     return API_URLS[0];
 }
 
-// --- VALIDATE ---
+// --- VALIDATE TOKEN ---
 async function validateSteamToken(bearerToken) {
     const expiresAt = getTokenExpiryMs(bearerToken);
     const expired = Date.now() >= expiresAt;
@@ -257,7 +252,7 @@ async function refreshToken(refreshTk) {
     }
 }
 
-// --- REFRESH IN STOCK ---
+// --- REFRESH TOKEN IN STOCK ---
 async function refreshTokenInStock() {
     if (tokenStock.length === 0) {
         tokenStock.push({
@@ -302,18 +297,16 @@ function startAutoRefresh() {
     }, 5000);
 }
 
-// --- GENERATE TOKEN WITH COOLDOWN & NO-COOLDOWN ROLE ---
+// --- GENERATE TOKEN ---
 async function processTokenGeneration(interaction) {
     const userId = interaction.user.id;
     const member = interaction.member;
     
-    // DEFER IMMEDIATELY - prevents timeout
     await interaction.deferReply({ flags: 64 });
     
-    // CHECK FOR NO-COOLDOWN ROLE
+    // Check for no-cooldown role
     const hasNoCooldown = member && member.roles && member.roles.cache.has(NO_COOLDOWN_ROLE_ID);
     
-    // COOLDOWN CHECK - ONLY if user doesn't have the no-cooldown role
     if (!hasNoCooldown) {
         const cooldownKey = `public_${userId}`;
         if (cooldowns.has(cooldownKey)) {
@@ -323,7 +316,7 @@ async function processTokenGeneration(interaction) {
                 const minutes = Math.floor(remaining / 60000);
                 const seconds = Math.floor((remaining % 60000) / 1000);
                 return interaction.editReply({
-                    content: `⏳ Please wait ${minutes}m ${seconds}s before generating another token.`
+                    content: `⏳ Please wait ${minutes}m ${seconds}s`
                 });
             }
         }
@@ -365,7 +358,6 @@ async function processTokenGeneration(interaction) {
         tokenStock.shift();
         tokenStock.push(tokenObj);
         
-        // SET COOLDOWN - ONLY if user doesn't have the no-cooldown role
         if (!hasNoCooldown) {
             cooldowns.set(`public_${userId}`, Date.now() + 5 * 60 * 1000);
         }
@@ -546,7 +538,11 @@ client.on('interactionCreate', async interaction => {
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', bot: client.user ? 'online' : 'offline', timestamp: Date.now() }));
+        res.end(JSON.stringify({ 
+            status: 'ok', 
+            bot: client.user ? 'online' : 'offline', 
+            timestamp: Date.now() 
+        }));
         return;
     }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -557,7 +553,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => console.log(`[TMC] HTTP server on port ${PORT}`));
 server.on('error', err => console.error('[TMC] Server error:', err));
 
-// --- KEEP BOT ALIVE ---
+// --- LOGIN ---
 console.log('[TMC] 🔑 Logging in...');
 
 if (!process.env.DISCORD_TOKEN) {
@@ -573,22 +569,48 @@ if (!process.env.DISCORD_TOKEN) {
     });
 }
 
-// Keep process alive
+// --- KEEP BOT ALIVE - MULTIPLE METHODS ---
+
+// Method 1: Keep process alive
 process.stdin.resume();
+
+// Method 2: Handle errors
 process.on('unhandledRejection', (reason) => console.error('[TMC] Unhandled Rejection:', reason));
 process.on('uncaughtException', (err) => {
     console.error('[TMC] Uncaught Exception:', err);
+    // Don't exit
 });
 
-// Keep-alive ping every 60 seconds
+// Method 3: Ping every 45 seconds
 setInterval(() => {
     console.log('[TMC] ⏳ Bot is alive...');
-}, 60000);
+}, 45000);
 
-// Auto-restart if bot disconnects
+// Method 4: Auto-reconnect on disconnect
 client.on('disconnect', () => {
-    console.log('[TMC] ❌ Disconnected! Attempting to reconnect...');
+    console.log('[TMC] ❌ Disconnected! Reconnecting in 3 seconds...');
     setTimeout(() => {
         client.login(process.env.DISCORD_TOKEN).catch(() => {});
-    }, 5000);
+    }, 3000);
 });
+
+// Method 5: Resume connection
+client.on('resume', () => {
+    console.log('[TMC] ✅ Connection resumed');
+});
+
+// Method 6: Reconnecting
+client.on('reconnecting', () => {
+    console.log('[TMC] 🔄 Reconnecting...');
+});
+
+// Method 7: Warn on rate limit
+client.on('rateLimit', (info) => {
+    console.log(`[TMC] ⚠️ Rate limit hit: ${info.timeout}ms`);
+});
+
+// Method 8: Keep HTTP server responding
+setInterval(() => {
+    // Health check ping to keep Render happy
+    fetch(`http://localhost:${PORT}/health`).catch(() => {});
+}, 30000);
