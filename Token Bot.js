@@ -304,7 +304,6 @@ async function processTokenGeneration(interaction) {
     
     await interaction.deferReply({ flags: 64 });
     
-    // Check for no-cooldown role
     const hasNoCooldown = member && member.roles && member.roles.cache.has(NO_COOLDOWN_ROLE_ID);
     
     if (!hasNoCooldown) {
@@ -536,7 +535,7 @@ client.on('interactionCreate', async interaction => {
 
 // --- HTTP SERVER ---
 const server = http.createServer((req, res) => {
-    if (req.url === '/health') {
+    if (req.url === '/health' || req.url === '/') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             status: 'ok', 
@@ -545,8 +544,8 @@ const server = http.createServer((req, res) => {
         }));
         return;
     }
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Token Generator Bot is active!\n');
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
 });
 
 const PORT = process.env.PORT || 10000;
@@ -569,24 +568,20 @@ if (!process.env.DISCORD_TOKEN) {
     });
 }
 
-// --- KEEP BOT ALIVE - MULTIPLE METHODS ---
-
-// Method 1: Keep process alive
+// --- KEEP BOT ALIVE & ERROR HANDLING ---
 process.stdin.resume();
 
-// Method 2: Handle errors
-process.on('unhandledRejection', (reason) => console.error('[TMC] Unhandled Rejection:', reason));
+process.on('unhandledRejection', (reason) => {
+    console.error('[TMC] Unhandled Rejection:', reason);
+});
 process.on('uncaughtException', (err) => {
     console.error('[TMC] Uncaught Exception:', err);
-    // Don't exit
 });
 
-// Method 3: Ping every 45 seconds
 setInterval(() => {
     console.log('[TMC] ⏳ Bot is alive...');
 }, 45000);
 
-// Method 4: Auto-reconnect on disconnect
 client.on('disconnect', () => {
     console.log('[TMC] ❌ Disconnected! Reconnecting in 3 seconds...');
     setTimeout(() => {
@@ -594,23 +589,15 @@ client.on('disconnect', () => {
     }, 3000);
 });
 
-// Method 5: Resume connection
-client.on('resume', () => {
-    console.log('[TMC] ✅ Connection resumed');
-});
+client.on('resume', () => console.log('[TMC] ✅ Connection resumed'));
+client.on('reconnecting', () => console.log('[TMC] 🔄 Reconnecting...'));
+client.on('rateLimit', (info) => console.log(`[TMC] ⚠️ Rate limit hit: ${info.timeout}ms`));
 
-// Method 6: Reconnecting
-client.on('reconnecting', () => {
-    console.log('[TMC] 🔄 Reconnecting...');
-});
-
-// Method 7: Warn on rate limit
-client.on('rateLimit', (info) => {
-    console.log(`[TMC] ⚠️ Rate limit hit: ${info.timeout}ms`);
-});
-
-// Method 8: Keep HTTP server responding
-setInterval(() => {
-    // Health check ping to keep Render happy
-    fetch(`http://localhost:${PORT}/health`).catch(() => {});
-}, 30000);
+// External URL self-ping loop to prevent Render from idling out
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+if (RENDER_EXTERNAL_URL) {
+    setInterval(() => {
+        fetch(`${RENDER_EXTERNAL_URL}/health`).catch(() => {});
+    }, 14 * 60 * 1000);
+    console.log(`[TMC] 🌐 Keep-alive active targeting: ${RENDER_EXTERNAL_URL}`);
+}
