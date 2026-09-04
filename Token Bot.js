@@ -273,10 +273,10 @@ async function refreshTokenInStock() {
     } catch (err) {}
 }
 
-// --- AUTO-REFRESH ---
+// --- AUTO-REFRESH (1-MINUTE INTERVAL) ---
 function scheduleNextRefresh() {
     if (refreshInterval) clearTimeout(refreshInterval);
-    const delay = 3 * 60 * 1000;
+    const delay = 1 * 60 * 1000; // 1 minute
     refreshInterval = setTimeout(async () => {
         refreshInterval = null;
         if (isRefreshing) { scheduleNextRefresh(); return; }
@@ -287,7 +287,7 @@ function scheduleNextRefresh() {
 }
 
 function startAutoRefresh() {
-    console.log('[TMC] 🔄 Auto-refresh every 3 minutes');
+    console.log('[TMC] 🔄 Auto-refresh every 1 minute');
     isRefreshing = false;
     failedQueue = [];
     setTimeout(async () => {
@@ -295,6 +295,34 @@ function startAutoRefresh() {
         await refreshTokenInStock();
         scheduleNextRefresh();
     }, 5000);
+}
+
+// --- REFRESH ALL TOKENS HELPER ---
+async function refreshAllTokens() {
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (let i = 0; i < tokenStock.length; i++) {
+        const item = tokenStock[i];
+        if (!item.refresh) {
+            failCount++;
+            continue;
+        }
+        try {
+            const res = await refreshToken(item.refresh);
+            if (res && res.success) {
+                tokenStock[i].bearer = res.bearer;
+                tokenStock[i].refresh = res.refresh;
+                tokenStock[i].expiresAt = res.expiresAt;
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (e) {
+            failCount++;
+        }
+    }
+    return { successCount, failCount };
 }
 
 // --- GENERATE TOKEN ---
@@ -416,6 +444,7 @@ async function processTokenGeneration(interaction) {
 const commandsData = [
     new SlashCommandBuilder().setName('stock').setDescription('Add token stock').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     new SlashCommandBuilder().setName('dashboard').setDescription('Token Generator panel'),
+    new SlashCommandBuilder().setName('refreshall').setDescription('Refresh all tokens in stock pool').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(cmd => cmd.toJSON());
 
 // --- READY ---
@@ -438,7 +467,7 @@ client.once('ready', async () => {
     } catch (error) {
         console.error('[TMC] Failed to register commands:', error);
     }
-    startAutoRefresh();
+    startAutoRefresh(); // 1-minute auto refresher starts here
     console.log('[TMC] ✅ Bot ready!');
 });
 
@@ -496,6 +525,20 @@ client.on('interactionCreate', async interaction => {
                     new ActionRowBuilder().addComponents(refreshInput)
                 );
                 return await interaction.showModal(modal);
+            }
+
+            if (commandName === 'refreshall') {
+                await interaction.deferReply({ flags: 64 });
+                if (tokenStock.length === 0) {
+                    return interaction.editReply({ content: '❌ No tokens in stock to refresh.' });
+                }
+                
+                await interaction.editReply({ content: `🔄 Refreshing all ${tokenStock.length} tokens in stock pool...` });
+                const { successCount, failCount } = await refreshAllTokens();
+                
+                return interaction.editReply({ 
+                    content: `✅ Refresh complete!\n- Successful: **${successCount}**\n- Failed: **${failCount}**\n- Total Stock: **${tokenStock.length}**` 
+                });
             }
         }
 
