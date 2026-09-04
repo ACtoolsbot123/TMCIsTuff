@@ -20,9 +20,9 @@ const http = require('http');
 // --- DNS FIX FOR RENDER ---
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
-console.log('[TMC] ✅ DNS set to Google DNS (8.8.8.8, 1.1.1.1)');
+console.log('[TMC] ✅ DNS set');
 
-// --- CREATE CLIENT WITH PROPER INTENTS ---
+// --- CREATE CLIENT ---
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -30,48 +30,31 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ],
-    rest: {
-        timeout: 60000
-    },
+    rest: { timeout: 60000 },
     failIfNotExists: false
 });
 
-// --- API CONFIGURATION ---
+// --- API CONFIG ---
 const NAKAMA_SERVER = 'https://animalcompany.us-east1.nakamacloud.io';
 const NAKAMA_SERVER_KEY = '6URuTSlDKKfYbuDW';
 const API_URLS = [ NAKAMA_SERVER ];
 
 let ACTIVE_API_URL = API_URLS[0];
 let apiWorking = false;
-
-// --- Token refresh queue system ---
 let isRefreshing = false;
 let failedQueue = [];
 let refreshAttempts = 0;
-const MAX_REFRESH_ATTEMPTS = 10;
-
-function processQueue(error, token = null) {
-    failedQueue.forEach(prom => {
-        if (error) {
-            prom.reject(error);
-        } else {
-            prom.resolve(token);
-        }
-    });
-    failedQueue = [];
-}
-
-// --- DEFAULT TOKEN ---
-let DEFAULT_TOKEN = {
-    "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI0Y2VhZTgxZC1jNDIzLTQ4NzItYjI5MC03OGVhYmI1YTQ2OWEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjY5OGQ5MzMzODAwNTQ5M2I4NmJkMzVjZWJmZWM2Y2RjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1MzA0NzMsImlhdCI6MTc4ODUyNjEyNH0.aLPkPaGpk_aBNxW8gdIb58cGnZfZz2_CPMgNVLLdrgU",
-    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI0Y2VhZTgxZC1jNDIzLTQ4NzItYjI5MC03OGVhYmI1YTQ2OWEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjY5OGQ5MzMzODAwNTQ5M2I4NmJkMzVjZWJmZWM2Y2RjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NDg0NzMsImlhdCI6MTc4ODUyNjEyNH0.PcRVsED6W8LrFZWNjFnsVXJJRomPtL2kkvxuBOCTKjc"
-};
-
 let tokenStock = [];
 const activeGenerations = new Map();
 let refreshInterval = null;
 
-// --- JWT / EXPIRY HELPERS ---
+// --- DEFAULT TOKEN ---
+let DEFAULT_TOKEN = {
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5MjMyZmY2My00NGFjLTRiOWYtYmZiNy0wMGY4NDVkNTliYjIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjJlMzgxYzVjMWJjMTQ1YzU5OTY0Yjk1OTJlNmJjYTUwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1Mzk3OTQsImlhdCI6MTc4ODUzNjE5NH0.01Yzh3cUk-yZKUBDqXKBllzyNXatrNA1r5s2QlJvQVY",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5MjMyZmY2My00NGFjLTRiOWYtYmZiNy0wMGY4NDVkNTliYjIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjJlMzgxYzVjMWJjMTQ1YzU5OTY0Yjk1OTJlNmJjYTUwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NTc3OTQsImlhdCI6MTc4ODUzNjE5NH0.mFjT0Fe9Zv1tQTS8QU-TqcmzFiLwsaf3N4QPEAXDKoM"
+};
+
+// --- JWT HELPERS ---
 function decodeJwt(token) {
     try {
         const part = (token || '').split('.')[1];
@@ -79,9 +62,7 @@ function decodeJwt(token) {
         const normalized = part.replace(/-/g, '+').replace(/_/g, '/');
         const json = Buffer.from(normalized + '===', 'base64').toString('utf-8');
         return JSON.parse(json);
-    } catch (e) {
-        return null;
-    }
+    } catch (e) { return null; }
 }
 
 function getTokenExpiryMs(token) {
@@ -114,7 +95,15 @@ function isTokenExpired(tokenObj) {
     return Date.now() >= getTokenExpiryMs(tokenObj.bearer);
 }
 
-// --- CLEANUP STUCK GENERATIONS ---
+function processQueue(error, token = null) {
+    failedQueue.forEach(prom => {
+        if (error) prom.reject(error);
+        else prom.resolve(token);
+    });
+    failedQueue = [];
+}
+
+// --- CLEANUP ---
 setInterval(() => {
     const now = Date.now();
     let cleaned = 0;
@@ -124,53 +113,35 @@ setInterval(() => {
             cleaned++;
         }
     }
-    if (cleaned > 0) {
-        console.log(`[TMC] Cleaned ${cleaned} stuck token generations`);
-    }
+    if (cleaned > 0) console.log(`[TMC] Cleaned ${cleaned} stuck generations`);
 }, 30000);
 
-// --- FIND WORKING API URL ---
+// --- FIND API ---
 async function findWorkingApiUrl() {
-    console.log('[TMC] Searching for working API URL...');
-    
     for (const url of API_URLS) {
         try {
-            console.log(`[TMC] Testing: ${url}`);
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
             const response = await fetch(url, {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-                },
+                headers: { 'Content-Type': 'application/json', 'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5' },
                 signal: controller.signal
             });
-            
             clearTimeout(timeoutId);
-            
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
-                console.log(`[TMC] ✅ Found working API: ${url}`);
                 ACTIVE_API_URL = url;
                 apiWorking = true;
                 return url;
-            } else {
-                console.log(`[TMC] ❌ Not a JSON API: ${url}`);
             }
-        } catch (err) {
-            console.log(`[TMC] ❌ Failed: ${url} - ${err.message}`);
-        }
+        } catch (err) {}
     }
-    
-    console.log('[TMC] ⚠️ No working API URL found. Using fallback mode.');
     apiWorking = false;
     return API_URLS[0];
 }
 
-// --- TOKEN VALIDATION ---
-async function validateSteamToken(bearerToken, retries = 3) {
+// --- VALIDATE ---
+async function validateSteamToken(bearerToken) {
     const expiresAt = getTokenExpiryMs(bearerToken);
     const expired = Date.now() >= expiresAt;
     return {
@@ -182,36 +153,27 @@ async function validateSteamToken(bearerToken, retries = 3) {
     };
 }
 
-// --- TOKEN REFRESH SYSTEM ---
+// --- REFRESH TOKEN ---
 async function refreshToken(refreshTk) {
     try {
-        console.log('[TMC] 🔄 Attempting to refresh token via Nakama...');
-        
         if (isRefreshing) {
-            console.log('[TMC] ⏳ Refresh in progress, queuing...');
             return new Promise((resolve, reject) => {
                 failedQueue.push({ resolve, reject });
             });
         }
 
         isRefreshing = true;
-        console.log('[TMC] 🔒 Refresh lock acquired');
-
         const urlsToTry = [...API_URLS];
         if (ACTIVE_API_URL && urlsToTry.includes(ACTIVE_API_URL)) {
             urlsToTry.splice(urlsToTry.indexOf(ACTIVE_API_URL), 1);
             urlsToTry.unshift(ACTIVE_API_URL);
         }
 
-        let lastError = null;
-
         for (const url of urlsToTry) {
             try {
                 const refreshUrl = `${url}/v2/account/session/refresh`;
-                console.log(`[TMC] 🔄 Trying refresh at: ${refreshUrl}`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 15000);
-
                 const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
 
                 const response = await fetch(refreshUrl, {
@@ -221,65 +183,35 @@ async function refreshToken(refreshTk) {
                         'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
                         'Authorization': serverKeyAuth
                     },
-                    body: JSON.stringify({ 
-                        token: refreshTk,
-                        refresh_token: refreshTk
-                    }),
+                    body: JSON.stringify({ token: refreshTk, refresh_token: refreshTk }),
                     signal: controller.signal
                 });
-
                 clearTimeout(timeoutId);
 
                 const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    console.log(`[TMC] ❌ ${url} - Not JSON response (status ${response.status})`);
-                    continue;
-                }
+                if (!contentType || !contentType.includes('application/json')) continue;
 
                 const data = await response.json();
-                console.log(`[TMC] 📦 Response from ${url}:`, JSON.stringify(data).substring(0, 200));
-
                 let newBearer = null;
                 let newRefresh = null;
 
-                if (data.token) {
-                    newBearer = data.token;
-                    newRefresh = data.refresh_token || refreshTk;
-                } else if (data.access_token) {
-                    newBearer = data.access_token;
-                    newRefresh = data.refresh_token || refreshTk;
-                } else if (data.bearer) {
-                    newBearer = data.bearer;
-                    newRefresh = data.refresh_token || refreshTk;
-                }
+                if (data.token) { newBearer = data.token; newRefresh = data.refresh_token || refreshTk; }
+                else if (data.access_token) { newBearer = data.access_token; newRefresh = data.refresh_token || refreshTk; }
+                else if (data.bearer) { newBearer = data.bearer; newRefresh = data.refresh_token || refreshTk; }
 
                 if (response.status === 200 && newBearer) {
                     const newExpiry = getTokenExpiryMs(newBearer);
-
-                    if (!newBearer || newBearer === refreshTk) {
-                        console.log(`[TMC] ⚠️ ${url} - Refresh returned same token, skipping`);
-                        continue;
-                    }
-
-                    if (newExpiry <= Date.now()) {
-                        console.log(`[TMC] ⚠️ ${url} - Refreshed token already expired, skipping`);
-                        continue;
-                    }
-
-                    console.log(`[TMC] ✅ Successfully refreshed token via ${url}!`);
-                    console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
-                    console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
-                    console.log(`[TMC] ⏳ ${humanExpiry(newExpiry)}`);
+                    if (!newBearer || newBearer === refreshTk) continue;
+                    if (newExpiry <= Date.now()) continue;
 
                     DEFAULT_TOKEN.bearer = newBearer;
                     DEFAULT_TOKEN.refresh_token = newRefresh;
                     ACTIVE_API_URL = url;
                     apiWorking = true;
-                    refreshAttempts = 0;
 
                     if (tokenStock.length > 0) {
                         const oldToken = tokenStock[0];
-                        const newToken = {
+                        tokenStock[0] = {
                             bearer: newBearer,
                             refresh: newRefresh,
                             addedAt: Date.now(),
@@ -288,7 +220,6 @@ async function refreshToken(refreshTk) {
                             userId: oldToken.userId,
                             username: oldToken.username
                         };
-                        tokenStock[0] = newToken;
                     } else {
                         tokenStock.push({
                             bearer: newBearer,
@@ -301,53 +232,31 @@ async function refreshToken(refreshTk) {
                         });
                     }
 
-                    const result = {
-                        success: true,
-                        bearer: newBearer,
-                        refresh: newRefresh,
-                        expiresAt: newExpiry
-                    };
-
+                    const result = { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry };
                     processQueue(null, result);
                     isRefreshing = false;
-                    console.log('[TMC] 🔓 Refresh lock released');
                     return result;
-                } else {
-                    console.log(`[TMC] ❌ ${url} - Status: ${response.status}`, data);
-                    lastError = data;
                 }
-            } catch (err) {
-                console.log(`[TMC] ❌ ${url} - ${err.message}`);
-                lastError = err.message;
-            }
+            } catch (err) {}
         }
 
-        console.log('[TMC] ❌ All refresh URLs failed');
-        console.log('[TMC] ⚠️ Last error:', lastError);
-        
         if (tokenStock.length > 0) {
-            console.log('[TMC] 📦 Keeping existing token in stock');
             tokenStock[0].expiresAt = getTokenExpiryMs(tokenStock[0].bearer);
         }
-        
+
         processQueue(new Error('All refresh URLs failed'), null);
         isRefreshing = false;
-        return { success: false, error: lastError };
-
+        return { success: false };
     } catch (err) {
-        console.error('[TMC] Refresh error:', err.message);
         processQueue(err, null);
         isRefreshing = false;
-        return { success: false, error: err.message };
+        return { success: false };
     }
 }
 
-// --- REFRESH TOKEN IN STOCK ---
+// --- REFRESH IN STOCK ---
 async function refreshTokenInStock() {
-    console.log('[TMC] 🔄 Auto-refreshing token...');
-    
     if (tokenStock.length === 0) {
-        console.log('[TMC] Stock was empty, re-adding default token...');
         tokenStock.push({
             bearer: DEFAULT_TOKEN.bearer,
             refresh: DEFAULT_TOKEN.refresh_token,
@@ -356,72 +265,33 @@ async function refreshTokenInStock() {
         });
         return;
     }
-    
     const tokenObj = tokenStock[0];
-    
-    if (!tokenObj.refresh) {
-        console.log('[TMC] ❌ No refresh token in stock!');
-        return;
-    }
-    
+    if (!tokenObj.refresh) return;
     try {
         const refreshResult = await refreshToken(tokenObj.refresh);
-        
         if (refreshResult.success) {
-            console.log('[TMC] ✅ Token refreshed with NEW strings!');
-            console.log(`[TMC] New Bearer: ${tokenStock[0].bearer.substring(0, 50)}...`);
-            console.log(`[TMC] ⏳ ${humanExpiry(tokenStock[0].expiresAt)}`);
-        } else {
-            console.log('[TMC] ❌ Refresh failed, keeping existing token');
-            console.log('[TMC] ⚠️ Error:', refreshResult.error || 'Unknown error');
-            tokenStock[0].expiresAt = getTokenExpiryMs(tokenStock[0].bearer);
-            tokenStock[0].addedAt = Date.now();
+            console.log('[TMC] ✅ Token refreshed');
         }
-    } catch (err) {
-        console.error('[TMC] Error in refresh process:', err);
-        console.log('[TMC] ❌ Keeping existing token - refresh failed');
-    }
-    
-    console.log(`[TMC] Stock count: ${tokenStock.length}`);
+    } catch (err) {}
 }
 
-// --- START AUTO-REFRESH (Every 3 minutes) ---
+// --- AUTO-REFRESH ---
 function scheduleNextRefresh() {
-    if (refreshInterval) {
-        clearTimeout(refreshInterval);
-        refreshInterval = null;
-    }
-
-    // ALWAYS refresh every 3 minutes (180,000 ms)
+    if (refreshInterval) clearTimeout(refreshInterval);
     const delay = 3 * 60 * 1000;
-
     refreshInterval = setTimeout(async () => {
         refreshInterval = null;
-        if (isRefreshing) {
-            console.log('[TMC] Refresh already in progress, rescheduling...');
-            scheduleNextRefresh();
-            return;
-        }
-        if (!apiWorking) {
-            await findWorkingApiUrl();
-        }
+        if (isRefreshing) { scheduleNextRefresh(); return; }
+        if (!apiWorking) await findWorkingApiUrl();
         await refreshTokenInStock();
         scheduleNextRefresh();
     }, delay);
-
-    console.log(`[TMC] ⏱️ Next auto-refresh in ${Math.round(delay / 1000)}s`);
 }
 
 function startAutoRefresh() {
-    console.log('[TMC] ================================');
-    console.log('[TMC] 🔄 AUTO-REFRESH STARTED');
-    console.log('[TMC] ⏳ Refreshing every 3 minutes');
-    console.log('[TMC] ================================');
-
+    console.log('[TMC] 🔄 Auto-refresh every 3 minutes');
     isRefreshing = false;
     failedQueue = [];
-    refreshAttempts = 0;
-
     setTimeout(async () => {
         await findWorkingApiUrl();
         await refreshTokenInStock();
@@ -429,18 +299,17 @@ function startAutoRefresh() {
     }, 5000);
 }
 
-// --- PROCESS TOKEN GENERATION ---
+// --- GENERATE TOKEN ---
 async function processTokenGeneration(interaction) {
     const userId = interaction.user.id;
     
+    // DEFER IMMEDIATELY - prevents timeout
     await interaction.deferReply({ flags: 64 });
     
     if (activeGenerations.has(userId)) {
         const startTime = activeGenerations.get(userId);
         if (Date.now() - startTime < 60000) {
-            return interaction.editReply({
-                content: '⏳ Please wait...'
-            });
+            return interaction.editReply({ content: '⏳ Please wait...' });
         } else {
             activeGenerations.delete(userId);
         }
@@ -448,11 +317,9 @@ async function processTokenGeneration(interaction) {
     
     activeGenerations.set(userId, Date.now());
     
-    await interaction.editReply({
-        content: '⏳ Generating...'
-    });
-    
     try {
+        await interaction.editReply({ content: '⏳ Generating...' });
+        
         if (tokenStock.length === 0) {
             tokenStock.push({
                 bearer: DEFAULT_TOKEN.bearer,
@@ -462,36 +329,18 @@ async function processTokenGeneration(interaction) {
             });
         }
         
-        await interaction.editReply({
-            content: '⏳ Validating...'
-        });
-        
         let tokenObj = tokenStock[0];
-        
         const refreshResult = await refreshToken(tokenObj.refresh);
-        if (refreshResult.success) {
-            tokenObj = tokenStock[0];
-        }
-        
-        await interaction.editReply({
-            content: '⏳ Finalizing...'
-        });
+        if (refreshResult.success) tokenObj = tokenStock[0];
         
         const validationResult = await validateSteamToken(tokenObj.bearer);
-        
-        if (validationResult.expiresAt) {
-            tokenObj.expiresAt = validationResult.expiresAt;
-        }
+        if (validationResult.expiresAt) tokenObj.expiresAt = validationResult.expiresAt;
         
         tokenObj.userId = interaction.user.id;
         tokenObj.username = interaction.user.tag;
         
         tokenStock.shift();
         tokenStock.push(tokenObj);
-        
-        await interaction.editReply({
-            content: '⏳ Sending...'
-        });
         
         const expiryText = humanExpiry(tokenObj.expiresAt);
         const tokenExpired = Date.now() >= tokenObj.expiresAt;
@@ -517,19 +366,11 @@ async function processTokenGeneration(interaction) {
             .setFooter({ text: `TMC Gen` });
         
         try {
-            await interaction.user.send({
-                embeds: [embed],
-                files: [attachment]
-            });
-            
+            await interaction.user.send({ embeds: [embed], files: [attachment] });
             activeGenerations.delete(userId);
-            return interaction.editReply({
-                content: `✅ Token sent!\n⏳ ${expiryText}`
-            });
+            return interaction.editReply({ content: `✅ Token sent!\n⏳ ${expiryText}` });
         } catch (err) {
-            console.error('[TMC] DM Error:', err);
             activeGenerations.delete(userId);
-            
             const fallbackEmbed = new EmbedBuilder()
                 .setDescription(
                     `⚠️ Could not send DM!\n\n` +
@@ -545,91 +386,56 @@ async function processTokenGeneration(interaction) {
                 content: '📩 Token sent here (DMs closed)'
             });
         }
-        
     } catch (err) {
-        console.error('[TMC] Token Generation Error:', err);
+        console.error('[TMC] Error:', err);
         activeGenerations.delete(userId);
-        return interaction.editReply({
-            content: '❌ Error. Please try again.'
-        });
+        return interaction.editReply({ content: '❌ Error. Try again.' });
     }
 }
 
 // --- SLASH COMMANDS ---
 const commandsData = [
-    new SlashCommandBuilder()
-        .setName('stock')
-        .setDescription('Add token stock')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder().setName('stock').setDescription('Add token stock').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder().setName('dashboard').setDescription('Token Generator panel'),
+].map(cmd => cmd.toJSON());
 
-    new SlashCommandBuilder()
-        .setName('dashboard')
-        .setDescription('Token Generator panel'),
-].map(command => command.toJSON());
-
-// --- READY EVENT ---
+// --- READY ---
 client.once('ready', async () => {
+    console.log(`[TMC] 🚀 ONLINE: ${client.user.tag}`);
+    console.log(`[TMC] 👑 Connected to ${client.guilds.cache.size} server(s)`);
+
+    tokenStock = [{
+        bearer: DEFAULT_TOKEN.bearer,
+        refresh: DEFAULT_TOKEN.refresh_token,
+        addedAt: Date.now(),
+        expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer)
+    }];
+
+    await findWorkingApiUrl();
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
-        console.log(`[TMC] 🚀 ONLINE: ${client.user.tag}`);
-        console.log('[TMC] 🔑 Token Generator Active');
-        console.log('[TMC] 🔄 Auto-Refresh Active');
-        console.log(`[TMC] 👑 Connected to ${client.guilds.cache.size} server(s)`);
-        console.log('[TMC] ================================');
-
-        isRefreshing = false;
-        failedQueue = [];
-
-        tokenStock = [{
-            bearer: DEFAULT_TOKEN.bearer,
-            refresh: DEFAULT_TOKEN.refresh_token,
-            addedAt: Date.now(),
-            expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer)
-        }];
-        console.log('[TMC] 📦 Default token added to stock');
-
-        await findWorkingApiUrl();
-
-        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-        try {
-            console.log('[TMC] 🔄 Registering slash commands...');
-            await rest.put(
-                Routes.applicationCommands(client.user.id),
-                { body: commandsData },
-            );
-            console.log('[TMC] ✅ Slash commands registered successfully!');
-        } catch (error) {
-            console.error('[TMC] Failed to register slash commands:', error);
-        }
-        
-        startAutoRefresh();
-        console.log('[TMC] ✅ Bot is fully ready!');
-    } catch (err) {
-        console.error('[TMC] Ready event error:', err);
+        await rest.put(Routes.applicationCommands(client.user.id), { body: commandsData });
+        console.log('[TMC] ✅ Commands registered');
+    } catch (error) {
+        console.error('[TMC] Failed to register commands:', error);
     }
+    startAutoRefresh();
+    console.log('[TMC] ✅ Bot ready!');
 });
 
 // --- ERROR HANDLING ---
-client.on('error', err => {
-    console.error('[TMC] Client error:', err);
-});
+client.on('error', err => console.error('[TMC] Client error:', err));
+client.on('disconnect', () => console.log('[TMC] Disconnected, reconnecting...'));
 
-client.on('disconnect', () => {
-    console.log('[TMC] Disconnected from Discord, attempting to reconnect...');
-});
-
-// --- INTERACTION CREATE ---
+// --- INTERACTIONS ---
 client.on('interactionCreate', async interaction => {
     try {
         if (interaction.isChatInputCommand()) {
             const { commandName } = interaction;
 
-            // --- DASHBOARD COMMAND ---
             if (commandName === 'dashboard') {
                 const embed = new EmbedBuilder()
-                    .setDescription(
-                        `**TMC Gen**\n\n` +
-                        `Click below to generate your token.`
-                    )
+                    .setDescription(`**TMC Gen**\n\nClick below to generate your token.`)
                     .setColor(0x5865F2)
                     .setFooter({ text: `TMC Gen` });
 
@@ -640,11 +446,9 @@ client.on('interactionCreate', async interaction => {
                         .setStyle(ButtonStyle.Success)
                         .setEmoji('🔑')
                 );
-
                 return interaction.reply({ embeds: [embed], components: [row] });
             }
 
-            // --- STOCK COMMAND (Admin only) ---
             if (commandName === 'stock') {
                 const modal = new ModalBuilder()
                     .setCustomId('stock_modal')
@@ -672,83 +476,49 @@ client.on('interactionCreate', async interaction => {
                     new ActionRowBuilder().addComponents(bearerInput),
                     new ActionRowBuilder().addComponents(refreshInput)
                 );
-
-                await interaction.showModal(modal);
+                return await interaction.showModal(modal);
             }
         }
 
-        // --- BUTTON HANDLERS ---
-        if (interaction.isButton()) {
-            if (interaction.customId === 'gen_public') {
-                return await processTokenGeneration(interaction);
-            }
+        if (interaction.isButton() && interaction.customId === 'gen_public') {
+            return await processTokenGeneration(interaction);
         }
 
-        // --- MODAL SUBMITS ---
-        if (interaction.isModalSubmit()) {
-            if (interaction.customId === 'stock_modal') {
-                try {
-                    await interaction.deferReply({ flags: 64 });
-                    
-                    const bearer = interaction.fields.getTextInputValue('stock_bearer_input').trim();
-                    const refresh = interaction.fields.getTextInputValue('stock_refresh_input').trim();
-                    
-                    if (!bearer || !refresh) {
-                        return interaction.editReply({
-                            content: '❌ Error: Both tokens required.'
-                        });
-                    }
-
-                    const validation = await validateSteamToken(bearer);
-                    
-                    if (!validation.valid) {
-                        return interaction.editReply({
-                            content: `❌ Invalid token: ${validation.message}`
-                        });
-                    }
-                    
-                    tokenStock.push({
-                        bearer,
-                        refresh,
-                        addedAt: Date.now(),
-                        expiresAt: getTokenExpiryMs(bearer)
-                    });
-
-                    return interaction.editReply({
-                        content: `📦 Token added! Total: \`${tokenStock.length}\``
-                    });
-                } catch (err) {
-                    console.error('[TMC] Stock Modal Error:', err);
-                    if (interaction.deferred) {
-                        return interaction.editReply({
-                            content: '❌ Error. Please try again.'
-                        });
-                    } else {
-                        return interaction.reply({
-                            content: '❌ Error. Please try again.',
-                            flags: 64
-                        });
-                    }
-                }
+        if (interaction.isModalSubmit() && interaction.customId === 'stock_modal') {
+            await interaction.deferReply({ flags: 64 });
+            const bearer = interaction.fields.getTextInputValue('stock_bearer_input').trim();
+            const refresh = interaction.fields.getTextInputValue('stock_refresh_input').trim();
+            
+            if (!bearer || !refresh) {
+                return interaction.editReply({ content: '❌ Error: Both tokens required.' });
             }
+
+            const validation = await validateSteamToken(bearer);
+            if (!validation.valid) {
+                return interaction.editReply({ content: `❌ Invalid token: ${validation.message}` });
+            }
+            
+            tokenStock.push({
+                bearer, refresh,
+                addedAt: Date.now(),
+                expiresAt: getTokenExpiryMs(bearer)
+            });
+
+            return interaction.editReply({ content: `📦 Token added! Total: \`${tokenStock.length}\`` });
         }
     } catch (err) {
-        console.error(`[TMC] Interaction Error:`, err);
+        console.error(`[TMC] Error:`, err);
         if (!interaction.replied && !interaction.deferred) {
             interaction.reply({ content: "❌ Error. Try again.", flags: 64 }).catch(() => {});
         }
     }
 });
 
-// --- HEALTH CHECK HTTP SERVER ---
+// --- HTTP SERVER ---
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-            status: 'ok', 
-            bot: client.user ? 'online' : 'offline', 
-            timestamp: Date.now() 
-        }));
+        res.end(JSON.stringify({ status: 'ok', bot: client.user ? 'online' : 'offline', timestamp: Date.now() }));
         return;
     }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -756,67 +526,26 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[TMC] HTTP server running on port ${PORT}`);
-});
+server.listen(PORT, '0.0.0.0', () => console.log(`[TMC] HTTP server on port ${PORT}`));
+server.on('error', err => console.error('[TMC] Server error:', err));
 
-// Handle server errors
-server.on('error', (err) => {
-    console.error('[TMC] Server error:', err);
-});
-
-// --- LOGIN WITH RETRY ---
-console.log('[TMC] 🔑 Attempting to login to Discord...');
+// --- LOGIN ---
+console.log('[TMC] 🔑 Logging in...');
 
 if (!process.env.DISCORD_TOKEN) {
-    console.error('[TMC] ❌ DISCORD_TOKEN environment variable is NOT set!');
+    console.error('[TMC] ❌ DISCORD_TOKEN not set!');
 } else {
-    console.log(`[TMC] ✅ DISCORD_TOKEN is set (length: ${process.env.DISCORD_TOKEN.length})`);
-    
-    async function loginWithRetry(attempts = 5) {
-        for (let i = 1; i <= attempts; i++) {
-            try {
-                console.log(`[TMC] 🔄 Login attempt ${i}/${attempts}...`);
-                const loginPromise = client.login(process.env.DISCORD_TOKEN);
-                const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('Login timeout after 30 seconds')), 30000);
-                });
-                await Promise.race([loginPromise, timeoutPromise]);
-                console.log('[TMC] ✅ Discord login successful!');
-                return true;
-            } catch (err) {
-                console.error(`[TMC] ❌ Login attempt ${i} failed:`, err.message);
-                if (i === attempts) {
-                    console.error('[TMC] ❌ All login attempts failed.');
-                    return false;
-                }
-                await new Promise(resolve => setTimeout(resolve, 5000 * i));
-            }
-        }
-        return false;
-    }
-
-    loginWithRetry().then(success => {
-        if (!success) {
-            console.error('[TMC] ❌ Bot failed to connect to Discord.');
-        }
+    console.log(`[TMC] ✅ Token set (length: ${process.env.DISCORD_TOKEN.length})`);
+    client.login(process.env.DISCORD_TOKEN).catch(err => {
+        console.error('[TMC] ❌ Login failed:', err.message);
     });
 }
 
-// --- KEEP BOT ALIVE ---
-// Prevent the process from exiting
+// --- KEEP ALIVE ---
 process.stdin.resume();
+process.on('unhandledRejection', (reason) => console.error('[TMC] Unhandled Rejection:', reason));
+process.on('uncaughtException', (err) => console.error('[TMC] Uncaught Exception:', err));
 
-// Handle uncaught errors
-process.on('unhandledRejection', (reason) => {
-    console.error('[TMC] Unhandled Rejection:', reason);
-});
-
-process.on('uncaughtException', (err) => {
-    console.error('[TMC] Uncaught Exception:', err);
-});
-
-// Keep-alive ping every minute
 setInterval(() => {
-    console.log('[TMC] ⏳ Bot is still alive...');
+    console.log('[TMC] ⏳ Alive...');
 }, 60000);
