@@ -17,6 +17,9 @@ const {
 
 const http = require('http');
 
+// --- CONFIGURATION ---
+const NO_COOLDOWN_ROLE_ID = "1527587043813625976";
+
 // --- DNS FIX FOR RENDER ---
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
@@ -45,10 +48,10 @@ let isRefreshing = false;
 let failedQueue = [];
 let refreshAttempts = 0;
 let tokenStock = [];
+const cooldowns = new Map();
 const activeGenerations = new Map();
 let refreshInterval = null;
 
-// --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
   "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5MjMyZmY2My00NGFjLTRiOWYtYmZiNy0wMGY4NDVkNTliYjIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjJlMzgxYzVjMWJjMTQ1YzU5OTY0Yjk1OTJlNmJjYTUwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1Mzk3OTQsImlhdCI6MTc4ODUzNjE5NH0.01Yzh3cUk-yZKUBDqXKBllzyNXatrNA1r5s2QlJvQVY",
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5MjMyZmY2My00NGFjLTRiOWYtYmZiNy0wMGY4NDVkNTliYjIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjJlMzgxYzVjMWJjMTQ1YzU5OTY0Yjk1OTJlNmJjYTUwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NTc3OTQsImlhdCI6MTc4ODUzNjE5NH0.mFjT0Fe9Zv1tQTS8QU-TqcmzFiLwsaf3N4QPEAXDKoM"
@@ -299,12 +302,32 @@ function startAutoRefresh() {
     }, 5000);
 }
 
-// --- GENERATE TOKEN ---
+// --- GENERATE TOKEN WITH COOLDOWN & NO-COOLDOWN ROLE ---
 async function processTokenGeneration(interaction) {
     const userId = interaction.user.id;
+    const member = interaction.member;
     
     // DEFER IMMEDIATELY - prevents timeout
     await interaction.deferReply({ flags: 64 });
+    
+    // CHECK FOR NO-COOLDOWN ROLE
+    const hasNoCooldown = member && member.roles && member.roles.cache.has(NO_COOLDOWN_ROLE_ID);
+    
+    // COOLDOWN CHECK - ONLY if user doesn't have the no-cooldown role
+    if (!hasNoCooldown) {
+        const cooldownKey = `public_${userId}`;
+        if (cooldowns.has(cooldownKey)) {
+            const cooldownEnd = cooldowns.get(cooldownKey);
+            if (Date.now() < cooldownEnd) {
+                const remaining = cooldownEnd - Date.now();
+                const minutes = Math.floor(remaining / 60000);
+                const seconds = Math.floor((remaining % 60000) / 1000);
+                return interaction.editReply({
+                    content: `⏳ Please wait ${minutes}m ${seconds}s before generating another token.`
+                });
+            }
+        }
+    }
     
     if (activeGenerations.has(userId)) {
         const startTime = activeGenerations.get(userId);
@@ -341,6 +364,11 @@ async function processTokenGeneration(interaction) {
         
         tokenStock.shift();
         tokenStock.push(tokenObj);
+        
+        // SET COOLDOWN - ONLY if user doesn't have the no-cooldown role
+        if (!hasNoCooldown) {
+            cooldowns.set(`public_${userId}`, Date.now() + 5 * 60 * 1000);
+        }
         
         const expiryText = humanExpiry(tokenObj.expiresAt);
         const tokenExpired = Date.now() >= tokenObj.expiresAt;
@@ -529,7 +557,7 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => console.log(`[TMC] HTTP server on port ${PORT}`));
 server.on('error', err => console.error('[TMC] Server error:', err));
 
-// --- LOGIN ---
+// --- KEEP BOT ALIVE ---
 console.log('[TMC] 🔑 Logging in...');
 
 if (!process.env.DISCORD_TOKEN) {
@@ -538,14 +566,29 @@ if (!process.env.DISCORD_TOKEN) {
     console.log(`[TMC] ✅ Token set (length: ${process.env.DISCORD_TOKEN.length})`);
     client.login(process.env.DISCORD_TOKEN).catch(err => {
         console.error('[TMC] ❌ Login failed:', err.message);
+        setTimeout(() => {
+            console.log('[TMC] 🔄 Retrying login...');
+            client.login(process.env.DISCORD_TOKEN).catch(() => {});
+        }, 5000);
     });
 }
 
-// --- KEEP ALIVE ---
+// Keep process alive
 process.stdin.resume();
 process.on('unhandledRejection', (reason) => console.error('[TMC] Unhandled Rejection:', reason));
-process.on('uncaughtException', (err) => console.error('[TMC] Uncaught Exception:', err));
+process.on('uncaughtException', (err) => {
+    console.error('[TMC] Uncaught Exception:', err);
+});
 
+// Keep-alive ping every 60 seconds
 setInterval(() => {
-    console.log('[TMC] ⏳ Alive...');
+    console.log('[TMC] ⏳ Bot is alive...');
 }, 60000);
+
+// Auto-restart if bot disconnects
+client.on('disconnect', () => {
+    console.log('[TMC] ❌ Disconnected! Attempting to reconnect...');
+    setTimeout(() => {
+        client.login(process.env.DISCORD_TOKEN).catch(() => {});
+    }, 5000);
+});
