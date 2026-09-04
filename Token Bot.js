@@ -293,6 +293,7 @@ async function nakamaRefreshSession(refreshTokenValue) {
 // --- NAKAMA DEVICE AUTH (POST /v2/account/authenticate/device) ---
 // This creates a FRESH session using the device ID from the JWT.
 // Works even when both bearer AND refresh tokens are fully expired.
+// Nakama sends: create & username as query params, body is only the account object.
 async function nakamaDeviceAuth(deviceId, username) {
     const paths = [
         '/v2/account/authenticate/device',
@@ -301,19 +302,19 @@ async function nakamaDeviceAuth(deviceId, username) {
 
     const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
 
+    // build query string with create + username
+    let query = '?create=true';
+    if (username) query += `&username=${encodeURIComponent(username)}`;
+
     for (const url of API_URLS) {
         for (const endpointPath of paths) {
-            const fullUrl = `${url}${endpointPath}`;
+            const fullUrl = `${url}${endpointPath}${query}`;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-                // Nakama REST API wraps in nested object: { device: { id }, create, username }
-                const body = JSON.stringify({
-                    device: { id: deviceId },
-                    create: true,
-                    username: username || undefined
-                });
+                // Nakama body is ONLY the ApiAccountDevice: { id, vars }
+                const body = JSON.stringify({ id: deviceId });
 
                 console.log(`[TMC] 🎮 DeviceAuth POST ${fullUrl}`);
 
@@ -361,33 +362,6 @@ async function nakamaDeviceAuth(deviceId, username) {
                         };
                     }
                 }
-
-                if (response.status === 400) {
-                    // Try alternate body format (flat id)
-                    const flatBody = JSON.stringify({ id: deviceId, create: true, username: username || undefined });
-                    console.log(`[TMC] 🎮 DeviceAuth retrying with flat body...`);
-                    const controller2 = new AbortController();
-                    const timeout2 = setTimeout(() => controller2.abort(), 8000);
-                    const resp2 = await fetch(fullUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': serverKeyAuth, 'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5' },
-                        body: flatBody,
-                        signal: controller2.signal
-                    });
-                    clearTimeout(timeout2);
-                    if (resp2.ok) {
-                        const ct2 = resp2.headers.get('content-type');
-                        if (ct2 && ct2.includes('application/json')) {
-                            const d2 = await resp2.json();
-                            const nb = d2.token || d2.access_token;
-                            if (nb) {
-                                const ne = getTokenExpiryMs(nb);
-                                console.log(`[TMC] ✅ Device auth SUCCESS (flat) via ${fullUrl}!`);
-                                return { success: true, bearer: nb, refresh: d2.refresh_token || null, expiresAt: ne };
-                            }
-                        }
-                    }
-                }
             } catch (err) {
                 console.log(`[TMC] 🎮 DeviceAuth exception: ${err.message}`);
                 continue;
@@ -408,19 +382,18 @@ async function nakamaCustomAuth(authId, username) {
 
     const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
 
+    let query = '?create=true';
+    if (username) query += `&username=${encodeURIComponent(username)}`;
+
     for (const url of API_URLS) {
         for (const endpointPath of paths) {
-            const fullUrl = `${url}${endpointPath}`;
+            const fullUrl = `${url}${endpointPath}${query}`;
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-                // Nakama REST API wraps in nested object: { custom: { id }, create, username }
-                const body = JSON.stringify({
-                    custom: { id: authId },
-                    create: true,
-                    username: username || undefined
-                });
+                // Nakama body is ONLY the ApiAccountCustom: { id, vars }
+                const body = JSON.stringify({ id: authId });
 
                 console.log(`[TMC] 🎯 CustomAuth POST ${fullUrl}`);
 
@@ -466,33 +439,6 @@ async function nakamaCustomAuth(authId, username) {
                             expiresAt: newExpiry,
                             created: data.created || false
                         };
-                    }
-                }
-
-                if (response.status === 400) {
-                    // Try alternate body format (flat id)
-                    const flatBody = JSON.stringify({ id: authId, create: true, username: username || undefined });
-                    console.log(`[TMC] 🎯 CustomAuth retrying with flat body...`);
-                    const controller2 = new AbortController();
-                    const timeout2 = setTimeout(() => controller2.abort(), 8000);
-                    const resp2 = await fetch(fullUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': serverKeyAuth, 'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5' },
-                        body: flatBody,
-                        signal: controller2.signal
-                    });
-                    clearTimeout(timeout2);
-                    if (resp2.ok) {
-                        const ct2 = resp2.headers.get('content-type');
-                        if (ct2 && ct2.includes('application/json')) {
-                            const d2 = await resp2.json();
-                            const nb = d2.token || d2.access_token;
-                            if (nb) {
-                                const ne = getTokenExpiryMs(nb);
-                                console.log(`[TMC] ✅ Custom auth SUCCESS (flat) via ${fullUrl}!`);
-                                return { success: true, bearer: nb, refresh: d2.refresh_token || null, expiresAt: ne };
-                            }
-                        }
                     }
                 }
             } catch (err) {
