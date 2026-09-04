@@ -440,6 +440,47 @@ async function processTokenGeneration(interaction) {
     }
 }
 
+// --- REFRESH BUTTON HANDLER ---
+async function processRefreshToken(interaction) {
+    await interaction.deferReply({ flags: 64 });
+    
+    try {
+        if (tokenStock.length === 0) {
+            return interaction.editReply({ content: '❌ No tokens in stock to refresh.' });
+        }
+        
+        await interaction.editReply({ content: '🔄 Refreshing token...' });
+        
+        const tokenObj = tokenStock[0];
+        if (!tokenObj.refresh) {
+            return interaction.editReply({ content: '❌ No refresh token found in stock!' });
+        }
+        
+        const refreshResult = await refreshToken(tokenObj.refresh);
+        
+        if (refreshResult.success) {
+            const expiryText = humanExpiry(tokenStock[0].expiresAt);
+            const embed = new EmbedBuilder()
+                .setDescription(
+                    `✅ Token refreshed successfully!\n\n` +
+                    `📁 New token is ready in stock\n\n` +
+                    `⏳ Status: **${expiryText}**`
+                )
+                .setColor(0x2ECC71)
+                .setFooter({ text: `TMC Gen` });
+            
+            return interaction.editReply({ embeds: [embed], content: '🔄 Token refreshed!' });
+        } else {
+            return interaction.editReply({ 
+                content: `❌ Failed to refresh token. Error: ${refreshResult.error || 'Unknown error'}\n\nTry using /stock to add a fresh token.` 
+            });
+        }
+    } catch (err) {
+        console.error('[TMC] Refresh Error:', err);
+        return interaction.editReply({ content: '❌ Error refreshing token. Try again.' });
+    }
+}
+
 // --- SLASH COMMANDS ---
 const commandsData = [
     new SlashCommandBuilder().setName('stock').setDescription('Add token stock').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -467,7 +508,7 @@ client.once('ready', async () => {
     } catch (error) {
         console.error('[TMC] Failed to register commands:', error);
     }
-    startAutoRefresh(); // 1-minute auto refresher starts here
+    startAutoRefresh();
     console.log('[TMC] ✅ Bot ready!');
 });
 
@@ -487,14 +528,23 @@ client.on('interactionCreate', async interaction => {
                     .setColor(0x5865F2)
                     .setFooter({ text: `TMC Gen` });
 
-                const row = new ActionRowBuilder().addComponents(
+                const row1 = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
                         .setCustomId('gen_public')
                         .setLabel('Gen Token')
                         .setStyle(ButtonStyle.Success)
                         .setEmoji('🔑')
                 );
-                return interaction.reply({ embeds: [embed], components: [row] });
+
+                const row2 = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('refresh_token_btn')
+                        .setLabel('🔄 Refresh Token')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🔄')
+                );
+
+                return interaction.reply({ embeds: [embed], components: [row1, row2] });
             }
 
             if (commandName === 'stock') {
@@ -542,8 +592,15 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        if (interaction.isButton() && interaction.customId === 'gen_public') {
-            return await processTokenGeneration(interaction);
+        // --- BUTTON HANDLERS ---
+        if (interaction.isButton()) {
+            if (interaction.customId === 'gen_public') {
+                return await processTokenGeneration(interaction);
+            }
+            
+            if (interaction.customId === 'refresh_token_btn') {
+                return await processRefreshToken(interaction);
+            }
         }
 
         if (interaction.isModalSubmit() && interaction.customId === 'stock_modal') {
