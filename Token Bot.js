@@ -39,12 +39,7 @@ const client = new Client({
 // --- API CONFIGURATION ---
 const NAKAMA_SERVER = 'https://animalcompany.us-east1.nakamacloud.io';
 const NAKAMA_SERVER_KEY = '6URuTSlDKKfYbuDW';
-// Nakama default API port is 7350 — try multiple URLs
-const API_URLS = [
-    'https://animalcompany.us-east1.nakamacloud.io',
-    'https://animalcompany.us-east1.nakamacloud.io:7350',
-    'http://animalcompany.us-east1.nakamacloud.io:7350'
-];
+const API_URLS = [ NAKAMA_SERVER ];
 
 let ACTIVE_API_URL = API_URLS[0];
 let apiWorking = false;
@@ -68,8 +63,8 @@ function processQueue(error, token = null) {
 
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIzZTQwYzY0Ni0wZTg1LTQwNTMtOWM3OC1mOGQzYTAyOTIzOWYiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjU5NjVlZTA0OTViZjRkYWQ5MzJmOTRhOWQwMTlkMjVjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1MjgzODcsImlhdCI6MTc4ODUyNDc4N30.7ThGPsTd20FL1vgZ2XMzXBhzoeRGqJ2dMJtQurTj5JQ",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIzZTQwYzY0Ni0wZTg1LTQwNTMtOWM3OC1mOGQzYTAyOTIzOWYiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjU5NjVlZTA0OTViZjRkYWQ5MzJmOTRhOWQwMTlkMjVjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NDYzODcsImlhdCI6MTc4ODUyNDc4N30.nYCgOqxWY2cBKBz5mkxBxF44Q_e7bRSzYbEPUrRV5x0"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI0Y2VhZTgxZC1jNDIzLTQ4NzItYjI5MC03OGVhYmI1YTQ2OWEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjY5OGQ5MzMzODAwNTQ5M2I4NmJkMzVjZWJmZWM2Y2RjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1Mjk3MjQsImlhdCI6MTc4ODUyNjEyNH0.hgIvyz5QmtvQLPZ9i3tF09NxXCiDXD8dsNXAeqVdy5w",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI0Y2VhZTgxZC1jNDIzLTQ4NzItYjI5MC03OGVhYmI1YTQ2OWEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjY5OGQ5MzMzODAwNTQ5M2I4NmJkMzVjZWJmZWM2Y2RjIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NDc3MjQsImlhdCI6MTc4ODUyNjEyNH0.KeUfmYz1LOL9cyHLMnJOH5zr5-NQusSdImgjZXUaW-Y"
 };
 
 let tokenStock = [];
@@ -119,444 +114,6 @@ function isTokenExpired(tokenObj) {
     return Date.now() >= getTokenExpiryMs(tokenObj.bearer);
 }
 
-// --- EXTRACT DEVICE ID FROM JWT ---
-function extractDeviceIdFromToken(bearerToken) {
-    try {
-        const payload = decodeJwt(bearerToken);
-        if (!payload) return null;
-
-        // device ID lives in vrs.deviceID
-        if (payload.vrs && payload.vrs.deviceID) {
-            return payload.vrs.deviceID;
-        }
-
-        // fallback: some tokens embed it differently
-        if (payload.device_id) return payload.device_id;
-
-        return null;
-    } catch (e) {
-        return null;
-    }
-}
-
-// --- EXTRACT AUTH ID FROM JWT (custom auth ID) ---
-function extractAuthIdFromToken(bearerToken) {
-    try {
-        const payload = decodeJwt(bearerToken);
-        if (!payload) return null;
-
-        if (payload.vrs && payload.vrs.authID) {
-            return payload.vrs.authID;
-        }
-
-        return null;
-    } catch (e) {
-        return null;
-    }
-}
-
-// --- EXTRACT USERNAME FROM JWT ---
-function extractUsernameFromToken(bearerToken) {
-    try {
-        const payload = decodeJwt(bearerToken);
-        if (!payload) return 'Unknown';
-        return payload.un || payload.usn || payload.username || 'Unknown';
-    } catch (e) {
-        return 'Unknown';
-    }
-}
-
-// --- NAKAMA ACCOUNT FETCH (GET /v2/account with bearer) ---
-async function fetchAccountFromNakama(bearerToken) {
-    for (const url of API_URLS) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            const accountUrl = `${url}/v2/account`;
-            console.log(`[TMC] 📡 AccountFetch GET ${accountUrl}`);
-
-            const response = await fetch(accountUrl, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${bearerToken}`,
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-                },
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            console.log(`[TMC] 📡 AccountFetch response: HTTP ${response.status} from ${url}`);
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.log(`[TMC] 📡 AccountFetch non-JSON: ${text.substring(0, 200)}`);
-                continue; // try next URL
-            }
-
-            const data = await response.json();
-
-            if (response.status === 200 && data) {
-                return {
-                    valid: true,
-                    status: 200,
-                    username: data.username || 'Unknown',
-                    userId: data.user_id || data.id || '',
-                    wallet: data.wallet || {},
-                    devices: data.devices || [],
-                    customId: data.custom_id || '',
-                    steamId: data.steam_id || '',
-                    createdAt: data.created_at || 0,
-                    updatedAt: data.updated_at || 0
-                };
-            } else {
-                console.log(`[TMC] 📡 AccountFetch error body: ${JSON.stringify(data).substring(0, 200)}`);
-                return { valid: false, status: response.status, error: `HTTP ${response.status}: ${JSON.stringify(data).substring(0, 150)}` };
-            }
-        } catch (err) {
-            console.log(`[TMC] 📡 AccountFetch exception: ${err.message}`);
-            continue;
-        }
-    }
-    return { valid: false, status: 0, error: 'All API URLs exhausted for account fetch' };
-}
-
-// --- NAKAMA SESSION REFRESH (POST /v2/account/session/refresh) ---
-async function nakamaRefreshSession(refreshTokenValue) {
-    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
-    const body = JSON.stringify({ token: refreshTokenValue });
-
-    for (const url of API_URLS) {
-        const refreshUrl = `${url}/v2/account/session/refresh`;
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            console.log(`[TMC] 🔄 Refresh POST ${refreshUrl}`);
-
-            const response = await fetch(refreshUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': serverKeyAuth,
-                    'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-                },
-                body: body,
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            console.log(`[TMC] 🔄 Refresh response: HTTP ${response.status} from ${refreshUrl}`);
-
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.log(`[TMC] 🔄 Refresh non-JSON: ${text.substring(0, 200)}`);
-                continue; // try next URL
-            }
-
-            const data = await response.json();
-            console.log(`[TMC] 🔄 Refresh data: ${JSON.stringify(data).substring(0, 300)}`);
-
-            let newBearer = data.token || data.access_token || data.bearer || null;
-            let newRefresh = data.refresh_token || refreshTokenValue;
-
-            if ((response.status === 200 || response.status === 201) && newBearer) {
-                const newExpiry = getTokenExpiryMs(newBearer);
-                if (newExpiry <= Date.now()) {
-                    console.log(`[TMC] 🔄 Refreshed token already expired, trying next URL...`);
-                    continue;
-                }
-                ACTIVE_API_URL = url;
-                return { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry };
-            } else {
-                // 401 = token dead, don't try other URLs for this error
-                if (response.status === 401) {
-                    return { success: false, status: 401, error: JSON.stringify(data).substring(0, 200) };
-                }
-                // Other errors, try next URL
-                continue;
-            }
-        } catch (err) {
-            console.log(`[TMC] 🔄 Refresh exception on ${refreshUrl}: ${err.message}`);
-            continue;
-        }
-    }
-
-    return { success: false, error: 'All refresh URLs exhausted' };
-}
-
-// --- NAKAMA DEVICE AUTH (POST /v2/account/authenticate/device) ---
-// This creates a FRESH session using the device ID from the JWT.
-// Works even when both bearer AND refresh tokens are fully expired.
-// Nakama sends: create & username as query params, body is only the account object.
-async function nakamaDeviceAuth(deviceId, username) {
-    const paths = [
-        '/v2/account/authenticate/device',
-        '/v2/account/session/authenticate/device'
-    ];
-
-    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
-
-    // build query string with create + username
-    let query = '?create=true';
-    if (username) query += `&username=${encodeURIComponent(username)}`;
-
-    for (const url of API_URLS) {
-        for (const endpointPath of paths) {
-            const fullUrl = `${url}${endpointPath}${query}`;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-                // Nakama body is ONLY the ApiAccountDevice: { id, vars }
-                const body = JSON.stringify({ id: deviceId });
-
-                console.log(`[TMC] 🎮 DeviceAuth POST ${fullUrl}`);
-
-                const response = await fetch(fullUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': serverKeyAuth,
-                        'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-                    },
-                    body: body,
-                    signal: controller.signal
-                });
-
-                clearTimeout(timeoutId);
-
-                console.log(`[TMC] 🎮 DeviceAuth response: HTTP ${response.status}`);
-
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    console.log(`[TMC] 🎮 DeviceAuth non-JSON: ${text.substring(0, 200)}`);
-                    continue;
-                }
-
-                const data = await response.json();
-                console.log(`[TMC] 🎮 DeviceAuth data: ${JSON.stringify(data).substring(0, 300)}`);
-
-                if (response.status === 404 || response.status === 403 || response.status === 401) {
-                    continue;
-                }
-
-                if ((response.status === 200 || response.status === 201) && data) {
-                    const newBearer = data.token || data.access_token || null;
-                    const newRefresh = data.refresh_token || null;
-                    if (newBearer) {
-                        const newExpiry = getTokenExpiryMs(newBearer);
-                        console.log(`[TMC] ✅ Device auth SUCCESS via ${fullUrl}!`);
-                        return {
-                            success: true,
-                            bearer: newBearer,
-                            refresh: newRefresh,
-                            expiresAt: newExpiry,
-                            created: data.created || false
-                        };
-                    }
-                }
-            } catch (err) {
-                console.log(`[TMC] 🎮 DeviceAuth exception: ${err.message}`);
-                continue;
-            }
-        }
-    }
-
-    return { success: false, error: 'All device auth endpoints exhausted' };
-}
-
-// --- NAKAMA CUSTOM AUTH (POST /v2/account/authenticate/custom) ---
-// Uses the authID from the JWT as a custom ID. Alternative to device auth.
-async function nakamaCustomAuth(authId, username) {
-    const paths = [
-        '/v2/account/authenticate/custom',
-        '/v2/account/session/authenticate/custom'
-    ];
-
-    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
-
-    let query = '?create=true';
-    if (username) query += `&username=${encodeURIComponent(username)}`;
-
-    for (const url of API_URLS) {
-        for (const endpointPath of paths) {
-            const fullUrl = `${url}${endpointPath}${query}`;
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-                // Nakama body is ONLY the ApiAccountCustom: { id, vars }
-                const body = JSON.stringify({ id: authId });
-
-                console.log(`[TMC] 🎯 CustomAuth POST ${fullUrl}`);
-
-                const response = await fetch(fullUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': serverKeyAuth,
-                        'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
-                    },
-                    body: body,
-                    signal: controller.signal
-                });
-
-                clearTimeout(timeoutId);
-
-                console.log(`[TMC] 🎯 CustomAuth response: HTTP ${response.status}`);
-
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    console.log(`[TMC] 🎯 CustomAuth non-JSON: ${text.substring(0, 200)}`);
-                    continue;
-                }
-
-                const data = await response.json();
-                console.log(`[TMC] 🎯 CustomAuth data: ${JSON.stringify(data).substring(0, 300)}`);
-
-                if (response.status === 404 || response.status === 403 || response.status === 401) {
-                    continue;
-                }
-
-                if ((response.status === 200 || response.status === 201) && data) {
-                    const newBearer = data.token || data.access_token || null;
-                    const newRefresh = data.refresh_token || null;
-                    if (newBearer) {
-                        const newExpiry = getTokenExpiryMs(newBearer);
-                        console.log(`[TMC] ✅ Custom auth SUCCESS via ${fullUrl}!`);
-                        return {
-                            success: true,
-                            bearer: newBearer,
-                            refresh: newRefresh,
-                            expiresAt: newExpiry,
-                            created: data.created || false
-                        };
-                    }
-                }
-            } catch (err) {
-                console.log(`[TMC] 🎯 CustomAuth exception: ${err.message}`);
-                continue;
-            }
-        }
-    }
-
-    return { success: false, error: 'All custom auth endpoints exhausted' };
-}
-
-// --- FULL LOGIN: bearer -> refresh -> device auth -> custom auth ---
-
-// --- FULL LOGIN: bearer -> refresh -> device auth -> custom auth ---
-async function fullLogin(tokenObj, label) {
-    label = label || '[Login]';
-
-    // === TIER 1: Try bearer token directly ===
-    if (tokenObj.bearer) {
-        const expired = Date.now() >= getTokenExpiryMs(tokenObj.bearer);
-        if (!expired) {
-            console.log(`${label} Tier 1: Bearer not expired, checking against Nakama...`);
-            const accCheck = await fetchAccountFromNakama(tokenObj.bearer);
-            if (accCheck.valid) {
-                console.log(`${label} ✅ Tier 1 SUCCESS - Logged in as ${accCheck.username}`);
-                tokenObj.accountInfo = accCheck;
-                tokenObj.expiresAt = getTokenExpiryMs(tokenObj.bearer);
-                return { success: true, method: 'bearer', account: accCheck };
-            }
-            console.log(`${label} ⚠️ Tier 1 Nakama rejected bearer: ${accCheck.error}`);
-        } else {
-            console.log(`${label} Tier 1: Bearer EXPIRED (${humanExpiry(getTokenExpiryMs(tokenObj.bearer))})`);
-        }
-    }
-
-    // === TIER 2: Try refresh token ===
-    if (tokenObj.refresh) {
-        const refreshExpired = Date.now() >= getTokenExpiryMs(tokenObj.refresh);
-        console.log(`${label} Tier 2: Attempting refresh... (refresh token ${refreshExpired ? 'EXPIRED' : 'valid'})`);
-        const refreshResult = await nakamaRefreshSession(tokenObj.refresh);
-        if (refreshResult.success) {
-            tokenObj.bearer = refreshResult.bearer;
-            tokenObj.refresh = refreshResult.refresh;
-            tokenObj.expiresAt = refreshResult.expiresAt;
-            console.log(`${label} ✅ Tier 2 SUCCESS - Refreshed, expires ${humanExpiry(refreshResult.expiresAt)}`);
-
-            // Verify the new token works
-            const accCheck = await fetchAccountFromNakama(refreshResult.bearer);
-            if (accCheck.valid) {
-                tokenObj.accountInfo = accCheck;
-                console.log(`${label} 👤 ${accCheck.username} (${accCheck.userId})`);
-                return { success: true, method: 'refresh', account: accCheck };
-            }
-            console.log(`${label} ⚠️ Refresh worked but account fetch failed: ${accCheck.error}`);
-            return { success: true, method: 'refresh', account: null };
-        } else {
-            console.log(`${label} ❌ Tier 2 FAILED (HTTP ${refreshResult.status || 'N/A'}): ${refreshResult.error}`);
-        }
-    } else {
-        console.log(`${label} ❌ No refresh token`);
-    }
-
-    // === TIER 3: Extract device ID and do fresh device auth ===
-    const deviceId = extractDeviceIdFromToken(tokenObj.bearer);
-    const jwtUsername = extractUsernameFromToken(tokenObj.bearer);
-    if (deviceId) {
-        console.log(`${label} Tier 3: Device auth with ID: ${deviceId}`);
-        const deviceResult = await nakamaDeviceAuth(deviceId, jwtUsername);
-        if (deviceResult.success) {
-            tokenObj.bearer = deviceResult.bearer;
-            if (deviceResult.refresh) tokenObj.refresh = deviceResult.refresh;
-            tokenObj.expiresAt = deviceResult.expiresAt;
-            console.log(`${label} ✅ Tier 3 SUCCESS - Fresh session created!`);
-
-            const accCheck = await fetchAccountFromNakama(deviceResult.bearer);
-            if (accCheck.valid) {
-                tokenObj.accountInfo = accCheck;
-                console.log(`${label} 👤 ${accCheck.username} (${accCheck.userId})`);
-                return { success: true, method: 'device_auth', account: accCheck };
-            }
-            return { success: true, method: 'device_auth', account: null };
-        } else {
-            console.log(`${label} ❌ Tier 3 FAILED: ${deviceResult.error}`);
-        }
-    } else {
-        console.log(`${label} ❌ Could not extract device ID from token`);
-    }
-
-    // === TIER 4: Extract authID and do custom auth ===
-    const authId = extractAuthIdFromToken(tokenObj.bearer);
-    if (authId) {
-        console.log(`${label} Tier 4: Custom auth with ID: ${authId}`);
-        const customResult = await nakamaCustomAuth(authId, jwtUsername);
-        if (customResult.success) {
-            tokenObj.bearer = customResult.bearer;
-            if (customResult.refresh) tokenObj.refresh = customResult.refresh;
-            tokenObj.expiresAt = customResult.expiresAt;
-            console.log(`${label} ✅ Tier 4 SUCCESS - Fresh session created!`);
-
-            const accCheck = await fetchAccountFromNakama(customResult.bearer);
-            if (accCheck.valid) {
-                tokenObj.accountInfo = accCheck;
-                console.log(`${label} 👤 ${accCheck.username} (${accCheck.userId})`);
-                return { success: true, method: 'custom_auth', account: accCheck };
-            }
-            return { success: true, method: 'custom_auth', account: null };
-        } else {
-            console.log(`${label} ❌ Tier 4 FAILED: ${customResult.error}`);
-        }
-    } else {
-        console.log(`${label} ❌ Could not extract authID from token`);
-    }
-
-    console.log(`${label} 🔴 ALL 4 TIERS FAILED`);
-    return { success: false, method: 'none', account: null };
-}
-
 // --- CLEANUP STUCK GENERATIONS ---
 setInterval(() => {
     const now = Date.now();
@@ -582,15 +139,12 @@ async function findWorkingApiUrl() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             
-            // Test with a session refresh endpoint (doesn't need auth)
-            const response = await fetch(`${url}/v2/account/session/refresh`, {
-                method: 'POST',
+            const response = await fetch(url, {
+                method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64'),
                     'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
                 },
-                body: JSON.stringify({ token: 'test' }),
                 signal: controller.signal
             });
             
@@ -598,12 +152,12 @@ async function findWorkingApiUrl() {
             
             const contentType = response.headers.get('content-type');
             if (contentType && contentType.includes('application/json')) {
-                console.log(`[TMC] ✅ Found working API: ${url} (HTTP ${response.status})`);
+                console.log(`[TMC] ✅ Found working API: ${url}`);
                 ACTIVE_API_URL = url;
                 apiWorking = true;
                 return url;
             } else {
-                console.log(`[TMC] ❌ Not a JSON API: ${url} (status ${response.status})`);
+                console.log(`[TMC] ❌ Not a JSON API: ${url}`);
             }
         } catch (err) {
             console.log(`[TMC] ❌ Failed: ${url} - ${err.message}`);
@@ -615,8 +169,8 @@ async function findWorkingApiUrl() {
     return API_URLS[0];
 }
 
-// --- TOKEN VALIDATION (local JWT check) ---
-async function validateSteamToken(bearerToken) {
+// --- TOKEN VALIDATION ---
+async function validateSteamToken(bearerToken, retries = 3) {
     const expiresAt = getTokenExpiryMs(bearerToken);
     const expired = Date.now() >= expiresAt;
     return {
@@ -628,75 +182,206 @@ async function validateSteamToken(bearerToken) {
     };
 }
 
-// --- LOGIN ALL TOKENS ON STARTUP ---
-async function loginAllTokens() {
-    console.log('[TMC] ================================');
-    console.log('[TMC] 🔐 LOGGING IN ALL TOKENS...');
-    console.log('[TMC] ================================');
-
-    if (tokenStock.length === 0) {
-        console.log('[TMC] No tokens in stock to login.');
-        return;
-    }
-
-    let loggedIn = 0;
-    let failed = 0;
-
-    for (let i = 0; i < tokenStock.length; i++) {
-        const tokenObj = tokenStock[i];
-        const label = `[Token ${i + 1}/${tokenStock.length}]`;
-
-        console.log(`[TMC] ${label} Processing...`);
-
-        const result = await fullLogin(tokenObj, label);
-
-        if (result.success) {
-            loggedIn++;
-        } else {
-            failed++;
+// --- TOKEN REFRESH SYSTEM ---
+async function refreshToken(refreshTk) {
+    try {
+        console.log('[TMC] 🔄 Attempting to refresh token via Nakama...');
+        
+        if (isRefreshing) {
+            console.log('[TMC] ⏳ Refresh in progress, queuing...');
+            return new Promise((resolve, reject) => {
+                failedQueue.push({ resolve, reject });
+            });
         }
 
-        // Small delay between logins to not hammer the server
-        if (i < tokenStock.length - 1) {
-            await new Promise(r => setTimeout(r, 1000));
-        }
-    }
+        isRefreshing = true;
+        console.log('[TMC] 🔒 Refresh lock acquired');
 
-    console.log('[TMC] ================================');
-    console.log(`[TMC] 🔐 Login complete! ${loggedIn} active / ${failed} failed / ${tokenStock.length} total`);
-    console.log('[TMC] ================================');
+        const urlsToTry = [...API_URLS];
+        if (ACTIVE_API_URL && urlsToTry.includes(ACTIVE_API_URL)) {
+            urlsToTry.splice(urlsToTry.indexOf(ACTIVE_API_URL), 1);
+            urlsToTry.unshift(ACTIVE_API_URL);
+        }
+
+        let lastError = null;
+
+        for (const url of urlsToTry) {
+            try {
+                const refreshUrl = `${url}/v2/account/session/refresh`;
+                console.log(`[TMC] 🔄 Trying refresh at: ${refreshUrl}`);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+                const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+
+                const response = await fetch(refreshUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
+                        'Authorization': serverKeyAuth
+                    },
+                    body: JSON.stringify({ 
+                        token: refreshTk,
+                        refresh_token: refreshTk
+                    }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.log(`[TMC] ❌ ${url} - Not JSON response (status ${response.status})`);
+                    continue;
+                }
+
+                const data = await response.json();
+                console.log(`[TMC] 📦 Response from ${url}:`, JSON.stringify(data).substring(0, 200));
+
+                let newBearer = null;
+                let newRefresh = null;
+
+                if (data.token) {
+                    newBearer = data.token;
+                    newRefresh = data.refresh_token || refreshTk;
+                } else if (data.access_token) {
+                    newBearer = data.access_token;
+                    newRefresh = data.refresh_token || refreshTk;
+                } else if (data.bearer) {
+                    newBearer = data.bearer;
+                    newRefresh = data.refresh_token || refreshTk;
+                }
+
+                if (response.status === 200 && newBearer) {
+                    const newExpiry = getTokenExpiryMs(newBearer);
+
+                    if (!newBearer || newBearer === refreshTk) {
+                        console.log(`[TMC] ⚠️ ${url} - Refresh returned same token, skipping`);
+                        continue;
+                    }
+
+                    if (newExpiry <= Date.now()) {
+                        console.log(`[TMC] ⚠️ ${url} - Refreshed token already expired, skipping`);
+                        continue;
+                    }
+
+                    console.log(`[TMC] ✅ Successfully refreshed token via ${url}!`);
+                    console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
+                    console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
+                    console.log(`[TMC] ⏳ ${humanExpiry(newExpiry)}`);
+
+                    DEFAULT_TOKEN.bearer = newBearer;
+                    DEFAULT_TOKEN.refresh_token = newRefresh;
+                    ACTIVE_API_URL = url;
+                    apiWorking = true;
+                    refreshAttempts = 0;
+
+                    if (tokenStock.length > 0) {
+                        const oldToken = tokenStock[0];
+                        const newToken = {
+                            bearer: newBearer,
+                            refresh: newRefresh,
+                            addedAt: Date.now(),
+                            expiresAt: newExpiry,
+                            id: oldToken.id,
+                            userId: oldToken.userId,
+                            username: oldToken.username
+                        };
+                        tokenStock[0] = newToken;
+                    } else {
+                        tokenStock.push({
+                            bearer: newBearer,
+                            refresh: newRefresh,
+                            addedAt: Date.now(),
+                            expiresAt: newExpiry,
+                            id: '',
+                            userId: 'system',
+                            username: 'System'
+                        });
+                    }
+
+                    const result = {
+                        success: true,
+                        bearer: newBearer,
+                        refresh: newRefresh,
+                        expiresAt: newExpiry
+                    };
+
+                    processQueue(null, result);
+                    isRefreshing = false;
+                    console.log('[TMC] 🔓 Refresh lock released');
+                    return result;
+                } else {
+                    console.log(`[TMC] ❌ ${url} - Status: ${response.status}`, data);
+                    lastError = data;
+                }
+            } catch (err) {
+                console.log(`[TMC] ❌ ${url} - ${err.message}`);
+                lastError = err.message;
+            }
+        }
+
+        console.log('[TMC] ❌ All refresh URLs failed');
+        console.log('[TMC] ⚠️ Last error:', lastError);
+        
+        if (tokenStock.length > 0) {
+            console.log('[TMC] 📦 Keeping existing token in stock');
+            tokenStock[0].expiresAt = getTokenExpiryMs(tokenStock[0].bearer);
+        }
+        
+        processQueue(new Error('All refresh URLs failed'), null);
+        isRefreshing = false;
+        return { success: false, error: lastError };
+
+    } catch (err) {
+        console.error('[TMC] Refresh error:', err.message);
+        processQueue(err, null);
+        isRefreshing = false;
+        return { success: false, error: err.message };
+    }
 }
 
-// --- AUTO REFRESH / RE-AUTH TICK ---
-async function autoRefreshTick() {
-    console.log('[TMC] 🔄 Auto-refresh tick...');
-
+// --- REFRESH TOKEN IN STOCK ---
+async function refreshTokenInStock() {
+    console.log('[TMC] 🔄 Auto-refreshing token...');
+    
     if (tokenStock.length === 0) {
-        console.log('[TMC] Stock empty, adding default token...');
+        console.log('[TMC] Stock was empty, re-adding default token...');
         tokenStock.push({
             bearer: DEFAULT_TOKEN.bearer,
             refresh: DEFAULT_TOKEN.refresh_token,
             addedAt: Date.now(),
             expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer)
         });
+        return;
     }
-
-    for (let i = 0; i < tokenStock.length; i++) {
-        const tokenObj = tokenStock[i];
-        const label = `[AutoRefresh ${i + 1}/${tokenStock.length}]`;
-        const result = await fullLogin(tokenObj, label);
-
-        if (result.success) {
-            console.log(`${label} ✅ Refreshed/login OK via ${result.method}`);
+    
+    const tokenObj = tokenStock[0];
+    
+    if (!tokenObj.refresh) {
+        console.log('[TMC] ❌ No refresh token in stock!');
+        return;
+    }
+    
+    try {
+        const refreshResult = await refreshToken(tokenObj.refresh);
+        
+        if (refreshResult.success) {
+            console.log('[TMC] ✅ Token refreshed with NEW strings!');
+            console.log(`[TMC] New Bearer: ${tokenStock[0].bearer.substring(0, 50)}...`);
+            console.log(`[TMC] ⏳ ${humanExpiry(tokenStock[0].expiresAt)}`);
         } else {
-            console.log(`${label} ❌ Could not refresh/login`);
+            console.log('[TMC] ❌ Refresh failed, keeping existing token');
+            console.log('[TMC] ⚠️ Error:', refreshResult.error || 'Unknown error');
+            tokenStock[0].expiresAt = getTokenExpiryMs(tokenStock[0].bearer);
+            tokenStock[0].addedAt = Date.now();
         }
-
-        if (i < tokenStock.length - 1) {
-            await new Promise(r => setTimeout(r, 1500));
-        }
+    } catch (err) {
+        console.error('[TMC] Error in refresh process:', err);
+        console.log('[TMC] ❌ Keeping existing token - refresh failed');
     }
-
+    
     console.log(`[TMC] Stock count: ${tokenStock.length}`);
 }
 
@@ -727,12 +412,10 @@ function scheduleNextRefresh() {
             scheduleNextRefresh();
             return;
         }
-        isRefreshing = true;
         if (!apiWorking) {
             await findWorkingApiUrl();
         }
-        await autoRefreshTick();
-        isRefreshing = false;
+        await refreshTokenInStock();
         scheduleNextRefresh();
     }, delay);
 
@@ -742,8 +425,7 @@ function scheduleNextRefresh() {
 function startAutoRefresh() {
     console.log('[TMC] ================================');
     console.log('[TMC] 🔄 AUTO-REFRESH STARTED');
-    console.log('[TMC] ⏳ Tokens refresh/re-auth BEFORE they expire!');
-    console.log('[TMC] Tier 1: Bearer → Tier 2: Refresh → Tier 3: Device Auth → Tier 4: Custom Auth');
+    console.log('[TMC] ⏳ Tokens refresh BEFORE they expire!');
     console.log('[TMC] ================================');
 
     isRefreshing = false;
@@ -752,7 +434,7 @@ function startAutoRefresh() {
 
     setTimeout(async () => {
         await findWorkingApiUrl();
-        await autoRefreshTick();
+        await refreshTokenInStock();
         scheduleNextRefresh();
     }, 5000);
 }
@@ -766,7 +448,9 @@ async function processTokenGeneration(interaction) {
     if (activeGenerations.has(userId)) {
         const startTime = activeGenerations.get(userId);
         if (Date.now() - startTime < 60000) {
-            return interaction.editReply({ content: '⏳ Please wait...' });
+            return interaction.editReply({
+                content: '⏳ Please wait...'
+            });
         } else {
             activeGenerations.delete(userId);
         }
@@ -774,7 +458,9 @@ async function processTokenGeneration(interaction) {
     
     activeGenerations.set(userId, Date.now());
     
-    await interaction.editReply({ content: '⏳ Generating...' });
+    await interaction.editReply({
+        content: '⏳ Generating...'
+    });
     
     try {
         if (tokenStock.length === 0) {
@@ -786,17 +472,36 @@ async function processTokenGeneration(interaction) {
             });
         }
         
+        await interaction.editReply({
+            content: '⏳ Validating...'
+        });
+        
         let tokenObj = tokenStock[0];
-
-        await interaction.editReply({ content: '⏳ Logging into Nakama...' });
-
-        // Full 3-tier login on the token we're about to give out
-        const loginResult = await fullLogin(tokenObj, '[Gen]');
-        if (loginResult.success) {
+        
+        const refreshResult = await refreshToken(tokenObj.refresh);
+        if (refreshResult.success) {
             tokenObj = tokenStock[0];
         }
-
-        await interaction.editReply({ content: '⏳ Finalizing...' });
+        
+        await interaction.editReply({
+            content: '⏳ Finalizing...'
+        });
+        
+        const validationResult = await validateSteamToken(tokenObj.bearer);
+        
+        if (validationResult.expiresAt) {
+            tokenObj.expiresAt = validationResult.expiresAt;
+        }
+        
+        tokenObj.userId = interaction.user.id;
+        tokenObj.username = interaction.user.tag;
+        
+        tokenStock.shift();
+        tokenStock.push(tokenObj);
+        
+        await interaction.editReply({
+            content: '⏳ Sending...'
+        });
         
         const expiryText = humanExpiry(tokenObj.expiresAt);
         const tokenExpired = Date.now() >= tokenObj.expiresAt;
@@ -812,28 +517,24 @@ async function processTokenGeneration(interaction) {
         const jsonBuffer = Buffer.from(jsonString, 'utf-8');
         const attachment = new AttachmentBuilder(jsonBuffer, { name: 'token.json' });
         
-        let accountLine = '';
-        if (tokenObj.accountInfo) {
-            accountLine = `\n👤 **${tokenObj.accountInfo.username}** (${tokenObj.accountInfo.userId})\n`;
-        } else {
-            accountLine = `\n🎮 Authenticated via ${loginResult.method || 'unknown'}\n`;
-        }
-
         const embed = new EmbedBuilder()
             .setDescription(
-                `✅ Token generated!${accountLine}\n` +
+                `✅ Token generated!\n\n` +
                 `📁 token.json attached\n\n` +
-                `⏳ Status: **${expiryText}**\n` +
-                `🔑 Auth method: **${loginResult.method || 'N/A'}**`
+                `⏳ Status: **${expiryText}**`
             )
             .setColor(tokenExpired ? 0xED4245 : 0x2ECC71)
             .setFooter({ text: `TMC Gen` });
         
         try {
-            await interaction.user.send({ embeds: [embed], files: [attachment] });
+            await interaction.user.send({
+                embeds: [embed],
+                files: [attachment]
+            });
+            
             activeGenerations.delete(userId);
             return interaction.editReply({
-                content: `✅ Token sent! ${expiryText}${accountLine}`
+                content: `✅ Token sent!\n⏳ ${expiryText}`
             });
         } catch (err) {
             console.error('[TMC] DM Error:', err);
@@ -841,7 +542,7 @@ async function processTokenGeneration(interaction) {
             
             const fallbackEmbed = new EmbedBuilder()
                 .setDescription(
-                    `⚠️ Could not send DM!${accountLine}\n` +
+                    `⚠️ Could not send DM!\n\n` +
                     `📁 token.json attached\n\n` +
                     `⏳ Status: **${expiryText}**`
                 )
@@ -858,7 +559,9 @@ async function processTokenGeneration(interaction) {
     } catch (err) {
         console.error('[TMC] Token Generation Error:', err);
         activeGenerations.delete(userId);
-        return interaction.editReply({ content: '❌ Error. Please try again.' });
+        return interaction.editReply({
+            content: '❌ Error. Please try again.'
+        });
     }
 }
 
@@ -872,20 +575,6 @@ const commandsData = [
     new SlashCommandBuilder()
         .setName('dashboard')
         .setDescription('Token Generator panel'),
-
-    new SlashCommandBuilder()
-        .setName('accounts')
-        .setDescription('Show all logged-in accounts'),
-
-    new SlashCommandBuilder()
-        .setName('refresh')
-        .setDescription('Force refresh/re-login all tokens')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-
-    new SlashCommandBuilder()
-        .setName('addtoken')
-        .setDescription('Add a token by pasting bearer + refresh')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(command => command.toJSON());
 
 // --- READY EVENT ---
@@ -893,7 +582,7 @@ client.once('ready', async () => {
     try {
         console.log(`[TMC] 🚀 ONLINE: ${client.user.tag}`);
         console.log('[TMC] 🔑 Token Generator Active');
-        console.log('[TMC] 🔄 Auto-Refresh Active (3-tier login)');
+        console.log('[TMC] 🔄 Auto-Refresh Active');
         console.log(`[TMC] 👑 Connected to ${client.guilds.cache.size} server(s)`);
         console.log('[TMC] ================================');
 
@@ -909,9 +598,6 @@ client.once('ready', async () => {
         console.log('[TMC] 📦 Default token added to stock');
 
         await findWorkingApiUrl();
-
-        // Login all tokens against Nakama on startup (even expired ones)
-        await loginAllTokens();
 
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         try {
@@ -968,106 +654,6 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ embeds: [embed], components: [row] });
             }
 
-            // --- ACCOUNTS COMMAND ---
-            if (commandName === 'accounts') {
-                await interaction.deferReply({ flags: 64 });
-
-                if (tokenStock.length === 0) {
-                    return interaction.editReply({ content: '❌ No tokens in stock.' });
-                }
-
-                let desc = `**🔐 Logged In Accounts** (${tokenStock.length})\n\n`;
-
-                for (let i = 0; i < tokenStock.length; i++) {
-                    const t = tokenStock[i];
-                    const expired = Date.now() >= (t.expiresAt || 0);
-                    const status = expired ? '🔴 Expired' : '🟢 Active';
-                    const remaining = expired ? 'Expired' : humanExpiry(t.expiresAt);
-                    const acc = t.accountInfo;
-
-                    if (acc) {
-                        desc += `**${i + 1}.** ${acc.username} \`${acc.userId}\`\n`;
-                        desc += `   ${status} | ⏳ ${remaining}\n\n`;
-                    } else {
-                        const jwtName = extractUsernameFromToken(t.bearer);
-                        desc += `**${i + 1}.** ${jwtName} (not validated against server)\n`;
-                        desc += `   ${status} | ⏳ ${remaining}\n\n`;
-                    }
-                }
-
-                const embed = new EmbedBuilder()
-                    .setDescription(desc)
-                    .setColor(0x2ECC71)
-                    .setFooter({ text: `TMC Gen | ${tokenStock.length} token(s)` });
-
-                return interaction.editReply({ embeds: [embed] });
-            }
-
-            // --- REFRESH COMMAND (Admin) ---
-            if (commandName === 'refresh') {
-                await interaction.deferReply({ flags: 64 });
-
-                await interaction.editReply({ content: '🔄 Force re-login all tokens (3-tier)...' });
-
-                if (!apiWorking) await findWorkingApiUrl();
-
-                let loggedIn = 0;
-                let failedCount = 0;
-
-                for (let i = 0; i < tokenStock.length; i++) {
-                    const t = tokenStock[i];
-                    const label = `[ForceRefresh ${i + 1}/${tokenStock.length}]`;
-
-                    await interaction.editReply({
-                        content: `🔄 Processing token ${i + 1}/${tokenStock.length}...`
-                    });
-
-                    const result = await fullLogin(t, label);
-                    if (result.success) loggedIn++;
-                    else failedCount++;
-
-                    if (i < tokenStock.length - 1) {
-                        await new Promise(r => setTimeout(r, 1500));
-                    }
-                }
-
-                return interaction.editReply({
-                    content: `✅ Force refresh complete!\n🟢 Logged in: ${loggedIn}\n🔴 Failed: ${failedCount}`
-                });
-            }
-
-            // --- ADDTOKEN COMMAND (Admin) ---
-            if (commandName === 'addtoken') {
-                const modal = new ModalBuilder()
-                    .setCustomId('addtoken_modal')
-                    .setTitle('Add Token to Stock');
-
-                const bearerInput = new TextInputBuilder()
-                    .setCustomId('bearer_input')
-                    .setLabel("BEARER TOKEN")
-                    .setStyle(TextInputStyle.Paragraph)
-                    .placeholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                    .setRequired(true)
-                    .setMinLength(10)
-                    .setMaxLength(2000);
-
-                const refreshInput = new TextInputBuilder()
-                    .setCustomId('refresh_input')
-                    .setLabel("REFRESH TOKEN")
-                    .setStyle(TextInputStyle.Paragraph)
-                    .placeholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                    .setRequired(true)
-                    .setMinLength(10)
-                    .setMaxLength(2000);
-
-                modal.addComponents(
-                    new ActionRowBuilder().addComponents(bearerInput),
-                    new ActionRowBuilder().addComponents(refreshInput)
-                );
-
-                await interaction.showModal(modal);
-            }
-
             // --- STOCK COMMAND (Admin only) ---
             if (commandName === 'stock') {
                 const modal = new ModalBuilder()
@@ -1078,7 +664,7 @@ client.on('interactionCreate', async interaction => {
                     .setCustomId('stock_bearer_input')
                     .setLabel("ENTER BEARER TOKEN")
                     .setStyle(TextInputStyle.Paragraph)
-                    .placeholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+                    .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
                     .setRequired(true)
                     .setMinLength(10)
                     .setMaxLength(2000);
@@ -1087,7 +673,7 @@ client.on('interactionCreate', async interaction => {
                     .setCustomId('stock_refresh_input')
                     .setLabel("ENTER REFRESH TOKEN")
                     .setStyle(TextInputStyle.Paragraph)
-                    .placeholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+                    .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
                     .setRequired(true)
                     .setMinLength(10)
                     .setMaxLength(2000);
@@ -1110,60 +696,6 @@ client.on('interactionCreate', async interaction => {
 
         // --- MODAL SUBMITS ---
         if (interaction.isModalSubmit()) {
-            // --- ADDTOKEN MODAL ---
-            if (interaction.customId === 'addtoken_modal') {
-                try {
-                    await interaction.deferReply({ flags: 64 });
-
-                    const bearer = interaction.fields.getTextInputValue('bearer_input').trim();
-                    const refresh = interaction.fields.getTextInputValue('refresh_input').trim();
-
-                    if (!bearer || !refresh) {
-                        return interaction.editReply({ content: '❌ Both tokens required.' });
-                    }
-
-                    // Build the token object - accept expired tokens too
-                    const tokenEntry = {
-                        bearer,
-                        refresh,
-                        addedAt: Date.now(),
-                        expiresAt: getTokenExpiryMs(bearer),
-                        accountInfo: null
-                    };
-
-                    tokenStock.push(tokenEntry);
-
-                    await interaction.editReply({ content: '🔐 Logging into Nakama (3-tier)...' });
-
-                    // Full login - works even if expired
-                    const label = `[AddToken]`;
-                    const result = await fullLogin(tokenEntry, label);
-
-                    const expiryText = humanExpiry(tokenEntry.expiresAt);
-
-                    if (result.success) {
-                        const acc = result.account;
-                        const accLine = acc ? `\n👤 **${acc.username}** (${acc.userId})` : '';
-                        return interaction.editReply({
-                            content: `✅ Token added & logged in!${accLine}\n🔑 Method: **${result.method}**\n⏳ ${expiryText}\n📦 Total: \`${tokenStock.length}\``
-                        });
-                    } else {
-                        const jwtName = extractUsernameFromToken(bearer);
-                        return interaction.editReply({
-                            content: `⚠️ Token added but all login tiers failed.\n👤 JWT name: ${jwtName}\n⏳ ${expiryText}\n📦 Total: \`${tokenStock.length}\``
-                        });
-                    }
-                } catch (err) {
-                    console.error('[TMC] AddToken Modal Error:', err);
-                    if (interaction.deferred) {
-                        return interaction.editReply({ content: '❌ Error. Please try again.' });
-                    } else {
-                        return interaction.reply({ content: '❌ Error. Please try again.', flags: 64 });
-                    }
-                }
-            }
-
-            // --- STOCK MODAL ---
             if (interaction.customId === 'stock_modal') {
                 try {
                     await interaction.deferReply({ flags: 64 });
@@ -1172,44 +704,40 @@ client.on('interactionCreate', async interaction => {
                     const refresh = interaction.fields.getTextInputValue('stock_refresh_input').trim();
                     
                     if (!bearer || !refresh) {
-                        return interaction.editReply({ content: '❌ Both tokens required.' });
+                        return interaction.editReply({
+                            content: '❌ Error: Both tokens required.'
+                        });
                     }
 
-                    const tokenEntry = {
+                    const validation = await validateSteamToken(bearer);
+                    
+                    if (!validation.valid) {
+                        return interaction.editReply({
+                            content: `❌ Invalid token: ${validation.message}`
+                        });
+                    }
+                    
+                    tokenStock.push({
                         bearer,
                         refresh,
                         addedAt: Date.now(),
-                        expiresAt: getTokenExpiryMs(bearer),
-                        accountInfo: null
-                    };
+                        expiresAt: getTokenExpiryMs(bearer)
+                    });
 
-                    tokenStock.push(tokenEntry);
-
-                    await interaction.editReply({ content: '🔐 Logging into Nakama (3-tier)...' });
-
-                    const label = `[Stock]`;
-                    const result = await fullLogin(tokenEntry, label);
-
-                    const expiryText = humanExpiry(tokenEntry.expiresAt);
-
-                    if (result.success) {
-                        const acc = result.account;
-                        const accLine = acc ? `\n👤 **${acc.username}** (${acc.userId})` : '';
-                        return interaction.editReply({
-                            content: `✅ Token added & logged in!${accLine}\n🔑 Method: **${result.method}**\n⏳ ${expiryText}\n📦 Total: \`${tokenStock.length}\``
-                        });
-                    } else {
-                        const jwtName = extractUsernameFromToken(bearer);
-                        return interaction.editReply({
-                            content: `⚠️ Token added but all login tiers failed.\n👤 JWT name: ${jwtName}\n⏳ ${expiryText}\n📦 Total: \`${tokenStock.length}\``
-                        });
-                    }
+                    return interaction.editReply({
+                        content: `📦 Token added! Total: \`${tokenStock.length}\``
+                    });
                 } catch (err) {
                     console.error('[TMC] Stock Modal Error:', err);
                     if (interaction.deferred) {
-                        return interaction.editReply({ content: '❌ Error. Please try again.' });
+                        return interaction.editReply({
+                            content: '❌ Error. Please try again.'
+                        });
                     } else {
-                        return interaction.reply({ content: '❌ Error. Please try again.', flags: 64 });
+                        return interaction.reply({
+                            content: '❌ Error. Please try again.',
+                            flags: 64
+                        });
                     }
                 }
             }
@@ -1226,17 +754,7 @@ client.on('interactionCreate', async interaction => {
 const server = http.createServer((req, res) => {
     if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-            status: 'ok', 
-            bot: 'online', 
-            accounts: tokenStock.map(t => ({
-                username: t.accountInfo?.username || extractUsernameFromToken(t.bearer),
-                userId: t.accountInfo?.userId || 'unknown',
-                valid: t.accountInfo?.valid || false,
-                expires: t.expiresAt
-            })),
-            timestamp: Date.now() 
-        }));
+        res.end(JSON.stringify({ status: 'ok', bot: 'online', timestamp: Date.now() }));
         return;
     }
     res.writeHead(200, { 'Content-Type': 'text/plain' });
