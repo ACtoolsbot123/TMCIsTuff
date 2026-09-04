@@ -152,6 +152,8 @@ async function fetchAccountFromNakama(bearerToken, apiUrl) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
+        console.log(`[TMC] 📡 AccountFetch GET ${url}/v2/account`);
+
         const response = await fetch(`${url}/v2/account`, {
             method: 'GET',
             headers: {
@@ -164,10 +166,13 @@ async function fetchAccountFromNakama(bearerToken, apiUrl) {
 
         clearTimeout(timeoutId);
 
+        console.log(`[TMC] 📡 AccountFetch response: HTTP ${response.status}`);
+
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            return { valid: false, status: response.status, error: `Non-JSON: ${text.substring(0, 150)}` };
+            console.log(`[TMC] 📡 AccountFetch non-JSON: ${text.substring(0, 300)}`);
+            return { valid: false, status: response.status, error: `HTTP ${response.status} - Non-JSON: ${text.substring(0, 150)}` };
         }
 
         const data = await response.json();
@@ -185,12 +190,12 @@ async function fetchAccountFromNakama(bearerToken, apiUrl) {
                 createdAt: data.created_at || 0,
                 updatedAt: data.updated_at || 0
             };
-        } else if (response.status === 401) {
-            return { valid: false, status: 401, error: 'Unauthorized - token expired' };
         } else {
-            return { valid: false, status: response.status, error: `HTTP ${response.status}` };
+            console.log(`[TMC] 📡 AccountFetch error body: ${JSON.stringify(data).substring(0, 300)}`);
+            return { valid: false, status: response.status, error: `HTTP ${response.status}: ${JSON.stringify(data).substring(0, 150)}` };
         }
     } catch (err) {
+        console.log(`[TMC] 📡 AccountFetch exception: ${err.message}`);
         return { valid: false, status: 0, error: err.message };
     }
 }
@@ -203,6 +208,11 @@ async function nakamaRefreshSession(refreshTokenValue, apiUrl) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
+        // Nakama ApiSessionRefreshRequest: { token, vars }
+        const body = JSON.stringify({ token: refreshTokenValue });
+
+        console.log(`[TMC] 🔄 Refresh POST ${url}/v2/account/session/refresh`);
+
         const response = await fetch(`${url}/v2/account/session/refresh`, {
             method: 'POST',
             headers: {
@@ -210,36 +220,38 @@ async function nakamaRefreshSession(refreshTokenValue, apiUrl) {
                 'Authorization': serverKeyAuth,
                 'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
             },
-            body: JSON.stringify({
-                token: refreshTokenValue,
-                refresh_token: refreshTokenValue
-            }),
+            body: body,
             signal: controller.signal
         });
 
         clearTimeout(timeoutId);
 
+        console.log(`[TMC] 🔄 Refresh response: HTTP ${response.status}`);
+
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            return { success: false, error: `Non-JSON: ${text.substring(0, 150)}` };
+            console.log(`[TMC] 🔄 Refresh non-JSON body: ${text.substring(0, 300)}`);
+            return { success: false, error: `HTTP ${response.status} - Non-JSON: ${text.substring(0, 150)}` };
         }
 
         const data = await response.json();
+        console.log(`[TMC] 🔄 Refresh data: ${JSON.stringify(data).substring(0, 300)}`);
 
         let newBearer = data.token || data.access_token || data.bearer || null;
         let newRefresh = data.refresh_token || refreshTokenValue;
 
-        if (response.status === 200 && newBearer) {
+        if ((response.status === 200 || response.status === 201) && newBearer) {
             const newExpiry = getTokenExpiryMs(newBearer);
             if (newExpiry <= Date.now()) {
                 return { success: false, error: 'Refreshed token already expired' };
             }
             return { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry };
         } else {
-            return { success: false, status: response.status, error: data };
+            return { success: false, status: response.status, error: JSON.stringify(data).substring(0, 200) };
         }
     } catch (err) {
+        console.log(`[TMC] 🔄 Refresh exception: ${err.message}`);
         return { success: false, error: err.message };
     }
 }
@@ -254,7 +266,11 @@ async function nakamaDeviceAuth(deviceId, apiUrl) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-        console.log(`[TMC] 🎮 Authenticating device: ${deviceId.substring(0, 16)}...`);
+        // Nakama ApiAccountDevice: { id }
+        const body = JSON.stringify({ id: deviceId });
+
+        console.log(`[TMC] 🎮 DeviceAuth POST ${url}/v2/account/session/authenticate/device`);
+        console.log(`[TMC] 🎮 Device ID: ${deviceId}`);
 
         const response = await fetch(`${url}/v2/account/session/authenticate/device`, {
             method: 'POST',
@@ -263,24 +279,25 @@ async function nakamaDeviceAuth(deviceId, apiUrl) {
                 'Authorization': serverKeyAuth,
                 'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5'
             },
-            body: JSON.stringify({
-                id: deviceId,
-                create: true
-            }),
+            body: body,
             signal: controller.signal
         });
 
         clearTimeout(timeoutId);
 
+        console.log(`[TMC] 🎮 DeviceAuth response: HTTP ${response.status}`);
+
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await response.text();
-            return { success: false, error: `Non-JSON: ${text.substring(0, 150)}` };
+            console.log(`[TMC] 🎮 DeviceAuth non-JSON body: ${text.substring(0, 300)}`);
+            return { success: false, error: `HTTP ${response.status} - Non-JSON: ${text.substring(0, 150)}` };
         }
 
         const data = await response.json();
+        console.log(`[TMC] 🎮 DeviceAuth data: ${JSON.stringify(data).substring(0, 300)}`);
 
-        if (response.status === 200 && data) {
+        if ((response.status === 200 || response.status === 201) && data) {
             const newBearer = data.token || data.access_token || null;
             const newRefresh = data.refresh_token || null;
             if (newBearer) {
@@ -294,11 +311,12 @@ async function nakamaDeviceAuth(deviceId, apiUrl) {
                     created: data.created || false
                 };
             }
-            return { success: false, error: 'Response missing token', data: data };
+            return { success: false, error: 'Response missing token', data: JSON.stringify(data).substring(0, 200) };
         } else {
-            return { success: false, status: response.status, error: data };
+            return { success: false, status: response.status, error: JSON.stringify(data).substring(0, 200) };
         }
     } catch (err) {
+        console.log(`[TMC] 🎮 DeviceAuth exception: ${err.message}`);
         return { success: false, error: err.message };
     }
 }
@@ -311,7 +329,7 @@ async function fullLogin(tokenObj, label) {
     if (tokenObj.bearer) {
         const expired = Date.now() >= getTokenExpiryMs(tokenObj.bearer);
         if (!expired) {
-            console.log(`${label} Tier 1: Bearer valid, checking against Nakama...`);
+            console.log(`${label} Tier 1: Bearer not expired, checking against Nakama...`);
             const accCheck = await fetchAccountFromNakama(tokenObj.bearer);
             if (accCheck.valid) {
                 console.log(`${label} ✅ Tier 1 SUCCESS - Logged in as ${accCheck.username}`);
@@ -319,15 +337,16 @@ async function fullLogin(tokenObj, label) {
                 tokenObj.expiresAt = getTokenExpiryMs(tokenObj.bearer);
                 return { success: true, method: 'bearer', account: accCheck };
             }
-            console.log(`${label} ⚠️ Bearer valid locally but Nakama rejected: ${accCheck.error}`);
+            console.log(`${label} ⚠️ Tier 1 Nakama rejected bearer: ${accCheck.error}`);
         } else {
-            console.log(`${label} Tier 1: Bearer expired (${humanExpiry(getTokenExpiryMs(tokenObj.bearer))})`);
+            console.log(`${label} Tier 1: Bearer EXPIRED (${humanExpiry(getTokenExpiryMs(tokenObj.bearer))})`);
         }
     }
 
     // === TIER 2: Try refresh token ===
     if (tokenObj.refresh) {
-        console.log(`${label} Tier 2: Attempting refresh...`);
+        const refreshExpired = Date.now() >= getTokenExpiryMs(tokenObj.refresh);
+        console.log(`${label} Tier 2: Attempting refresh... (refresh token ${refreshExpired ? 'EXPIRED' : 'valid'})`);
         const refreshResult = await nakamaRefreshSession(tokenObj.refresh);
         if (refreshResult.success) {
             tokenObj.bearer = refreshResult.bearer;
@@ -342,20 +361,20 @@ async function fullLogin(tokenObj, label) {
                 console.log(`${label} 👤 ${accCheck.username} (${accCheck.userId})`);
                 return { success: true, method: 'refresh', account: accCheck };
             }
-            console.log(`${label} ⚠️ Refresh worked but account fetch failed, returning partial success`);
+            console.log(`${label} ⚠️ Refresh worked but account fetch failed: ${accCheck.error}`);
             return { success: true, method: 'refresh', account: null };
         } else {
-            console.log(`${label} ❌ Tier 2 FAILED - ${refreshResult.error || JSON.stringify(refreshResult.error)}`);
+            console.log(`${label} ❌ Tier 2 FAILED (HTTP ${refreshResult.status || 'N/A'}): ${refreshResult.error}`);
         }
     } else {
-        console.log(`${label} ❌ No refresh token available`);
+        console.log(`${label} ❌ No refresh token`);
     }
 
     // === TIER 3: Extract device ID and do fresh device auth ===
     // We can extract device ID from ANY old bearer (even expired ones)
     const deviceId = extractDeviceIdFromToken(tokenObj.bearer);
     if (deviceId) {
-        console.log(`${label} Tier 3: Device auth with ID: ${deviceId.substring(0, 16)}...`);
+        console.log(`${label} Tier 3: Device auth with ID: ${deviceId}`);
         const deviceResult = await nakamaDeviceAuth(deviceId);
         if (deviceResult.success) {
             tokenObj.bearer = deviceResult.bearer;
@@ -371,7 +390,7 @@ async function fullLogin(tokenObj, label) {
             }
             return { success: true, method: 'device_auth', account: null };
         } else {
-            console.log(`${label} ❌ Tier 3 FAILED - ${deviceResult.error}`);
+            console.log(`${label} ❌ Tier 3 FAILED (HTTP ${deviceResult.status || 'N/A'}): ${deviceResult.error}`);
         }
     } else {
         console.log(`${label} ❌ Could not extract device ID from token`);
