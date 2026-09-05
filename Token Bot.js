@@ -51,11 +51,21 @@ let tokenStock = [];
 const cooldowns = new Map();
 const activeGenerations = new Map();
 let refreshInterval = null;
+let refreshRetryCount = 0;
+const MAX_REFRESH_RETRIES = 5;
+
+// --- TOKEN LIFETIME TRACKING ---
+let tokenLifetime = {
+    accessExpiresAt: 0,
+    refreshExpiresAt: 0,
+    lastRefreshSuccess: 0,
+    refreshCount: 0
+};
 
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5Nzc0MzExYS02MmQzLTQyODMtYTI4MC05MGYwNTY3ZjhkZjEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImI0NGE4ZWE0MzhjMDQwYjg4ZTM0MTUwY2RmZmNiNWMyIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1ODgzOTEsImlhdCI6MTc4ODU4NDc5MX0.hcy38_BfLNQUu9ws1IZFbc5NCU0JUKrQX3PoEAIaiOM",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5Nzc0MzExYS02MmQzLTQyODMtYTI4MC05MGYwNTY3ZjhkZjEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImI0NGE4ZWE0MzhjMDQwYjg4ZTM0MTUwY2RmZmNiNWMyIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2MDYzOTEsImlhdCI6MTc4ODU4NDc5MX0.LJdhfeY1-HAMv0uwj22gwchSBTGiOV47tc0VB38Fm8E"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5NmNlNjc5MC0xMmMwLTRiMDAtYjEwYS0yOWE1NWIyYzI5OWUiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjZkNGJlN2MyNTM5ZjQ2M2ZiMGIyNTA2NTNkNjFkNWQzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NDQzMTYsImlhdCI6MTc4ODY0MDcxNn0.RxTYTeAAUFHOY_OJ8tND1eerdRWTM6efLb11BREoUmw",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5NmNlNjc5MC0xMmMwLTRiMDAtYjEwYS0yOWE1NWIyYzI5OWUiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjZkNGJlN2MyNTM5ZjQ2M2ZiMGIyNTA2NTNkNjFkNWQzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NjIzMTYsImlhdCI6MTc4ODY0MDcxNn0.y_5DSojb9se3hP3rQ8dNRuQlTFnAjufFHA7mNjkIApA"
 };
 
 // --- JWT HELPERS ---
@@ -102,6 +112,18 @@ function getTokenExpiryMs(token) {
     return Date.now() + (60 * 60 * 1000);
 }
 
+function getTokenIssuedAtMs(token) {
+    const p = decodeJwt(token);
+    if (p && typeof p.iat === 'number') return p.iat * 1000;
+    return Date.now();
+}
+
+function getTokenLifetimeMs(token) {
+    const exp = getTokenExpiryMs(token);
+    const iat = getTokenIssuedAtMs(token);
+    return Math.max(exp - iat, 60000);
+}
+
 function formatRemainingTime(expiresAt) {
     const diff = expiresAt - Date.now();
     if (diff <= 0) return 'Expired';
@@ -119,6 +141,45 @@ function humanExpiry(expiresAt) {
     const diff = expiresAt - Date.now();
     if (diff <= 0) return 'Expired';
     return `${formatRemainingTime(expiresAt)}`;
+}
+
+function updateTokenLifetimeTracking(bearer, refreshToken) {
+    const bearerExp = getTokenExpiryMs(bearer);
+    const refreshExp = refreshToken ? getTokenExpiryMs(refreshToken) : 0;
+    
+    tokenLifetime.accessExpiresAt = bearerExp;
+    tokenLifetime.refreshExpiresAt = refreshExp;
+    tokenLifetime.lastRefreshSuccess = Date.now();
+    tokenLifetime.refreshCount++;
+    
+    const accessLife = getTokenLifetimeMs(bearer);
+    const refreshLife = refreshToken ? getTokenLifetimeMs(refreshToken) : 0;
+    
+    console.log(`[TMC] Token lifetime — access: ${Math.round(accessLife/1000/60)}min, refresh: ${refreshToken ? Math.round(refreshLife/1000/60) + 'min' : 'none'}`);
+    console.log(`[TMC] Access expires: ${new Date(bearerExp).toLocaleTimeString()}, Refresh expires: ${refreshToken ? new Date(refreshExp).toLocaleTimeString() : 'unknown'}`);
+    console.log(`[TMC] Total refreshes performed: ${tokenLifetime.refreshCount}`);
+}
+
+function getOptimalRefreshDelay() {
+    // Refresh at 40% of access token lifetime, but clamp between 30s and 30min
+    const bearerLife = getTokenLifetimeMs(DEFAULT_TOKEN.bearer);
+    const delay = Math.floor(bearerLife * 0.4);
+    const clamped = Math.max(30000, Math.min(delay, 30 * 60 * 1000));
+    return clamped;
+}
+
+function getRefreshHealthStatus() {
+    const now = Date.now();
+    const accessRemaining = tokenLifetime.accessExpiresAt - now;
+    const refreshRemaining = tokenLifetime.refreshExpiresAt - now;
+    return {
+        accessExpired: accessRemaining <= 0,
+        accessRemainingMs: accessRemaining,
+        refreshExpired: tokenLifetime.refreshExpiresAt > 0 && refreshRemaining <= 0,
+        refreshRemainingMs: refreshRemaining,
+        refreshesDone: tokenLifetime.refreshCount,
+        lastSuccessAgo: tokenLifetime.lastRefreshSuccess ? now - tokenLifetime.lastRefreshSuccess : null
+    };
 }
 
 function processQueue(error, token = null) {
@@ -184,6 +245,20 @@ async function refreshToken(refreshTk) {
     try {
         console.log('[TMC] Attempting to refresh token...');
         
+        // Check if refresh token itself is expired before even trying
+        const refreshExp = getTokenExpiryMs(refreshTk);
+        if (Date.now() >= refreshExp) {
+            console.log('[TMC] Refresh token is EXPIRED. Cannot refresh.');
+            return { success: false, error: 'Refresh token expired. Need fresh device auth.' };
+        }
+        
+        const refreshLifeRemaining = refreshExp - Date.now();
+        if (refreshLifeRemaining < 5 * 60 * 1000) {
+            console.log(`[TMC] WARNING: Refresh token expires in ${formatRemainingTime(refreshExp)} — very low!`);
+        } else if (refreshLifeRemaining < 30 * 60 * 1000) {
+            console.log(`[TMC] NOTICE: Refresh token expires in ${formatRemainingTime(refreshExp)}`);
+        }
+        
         if (isRefreshing) {
             console.log('[TMC] Refresh in progress, queuing...');
             return new Promise((resolve, reject) => {
@@ -245,26 +320,30 @@ async function refreshToken(refreshTk) {
 
                 if (response.status === 200 && newBearer) {
                     const newExpiry = getTokenExpiryMs(newBearer);
-                    
-                    if (newBearer === refreshTk) {
-                        console.log(`[TMC] ${url} - Refresh returned SAME token, skipping`);
-                        continue;
-                    }
+                    const newRefreshExpiry = getTokenExpiryMs(newRefresh);
 
+                    // Check if new access token is actually better than what we have
+                    const currentBearerExpiry = getTokenExpiryMs(DEFAULT_TOKEN.bearer);
                     if (newExpiry <= Date.now()) {
-                        console.log(`[TMC] ${url} - Refreshed token already expired`);
+                        console.log(`[TMC] ${url} - Refreshed token already expired, skipping`);
                         continue;
                     }
 
+                    // Even if same token returned, accept it as proof session is alive
+                    // The key is the server accepted our refresh — session is valid
                     console.log(`[TMC] Successfully refreshed token via ${url}!`);
                     console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
                     console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
-                    console.log(`[TMC] ${humanExpiry(newExpiry)}`);
+                    console.log(`[TMC] Access: ${humanExpiry(newExpiry)}, Refresh: ${humanExpiry(newRefreshExpiry)}`);
 
                     DEFAULT_TOKEN.bearer = newBearer;
                     DEFAULT_TOKEN.refresh_token = newRefresh;
                     ACTIVE_API_URL = url;
                     apiWorking = true;
+                    refreshRetryCount = 0;
+
+                    // Update token lifetime tracking
+                    updateTokenLifetimeTracking(newBearer, newRefresh);
 
                     if (tokenStock.length > 0) {
                         const oldToken = tokenStock[0];
@@ -273,6 +352,7 @@ async function refreshToken(refreshTk) {
                             refresh: newRefresh,
                             addedAt: Date.now(),
                             expiresAt: newExpiry,
+                            refreshExpiresAt: newRefreshExpiry,
                             id: oldToken.id,
                             userId: oldToken.userId,
                             username: oldToken.username
@@ -283,6 +363,7 @@ async function refreshToken(refreshTk) {
                             refresh: newRefresh,
                             addedAt: Date.now(),
                             expiresAt: newExpiry,
+                            refreshExpiresAt: newRefreshExpiry,
                             id: '',
                             userId: 'system',
                             username: 'System'
@@ -294,6 +375,7 @@ async function refreshToken(refreshTk) {
                         bearer: newBearer, 
                         refresh: newRefresh, 
                         expiresAt: newExpiry,
+                        refreshExpiresAt: newRefreshExpiry,
                         newToken: true
                     };
                     processQueue(null, result);
@@ -309,13 +391,15 @@ async function refreshToken(refreshTk) {
         }
 
         console.log('[TMC] All refresh URLs failed');
+        refreshRetryCount++;
+        
         if (tokenStock.length > 0) {
             tokenStock[0].expiresAt = getTokenExpiryMs(tokenStock[0].bearer);
         }
 
         processQueue(new Error('All refresh URLs failed'), null);
         isRefreshing = false;
-        return { success: false, error: 'All refresh URLs failed' };
+        return { success: false, error: 'All refresh URLs failed', retryCount: refreshRetryCount };
     } catch (err) {
         console.error('[TMC] Refresh error:', err.message);
         processQueue(err, null);
@@ -389,6 +473,7 @@ async function refreshSpecificToken(bearerInput, refreshInput) {
                     refresh: newRefresh,
                     addedAt: Date.now(),
                     expiresAt: newExpiry,
+                    refreshExpiresAt: newRefresh ? getTokenExpiryMs(newRefresh) : 0,
                     id: tokenStock[0].id,
                     userId: tokenStock[0].userId,
                     username: tokenStock[0].username
@@ -399,6 +484,7 @@ async function refreshSpecificToken(bearerInput, refreshInput) {
                     refresh: newRefresh,
                     addedAt: Date.now(),
                     expiresAt: newExpiry,
+                    refreshExpiresAt: newRefresh ? getTokenExpiryMs(newRefresh) : 0,
                     id: '',
                     userId: 'system',
                     username: 'System'
@@ -407,6 +493,9 @@ async function refreshSpecificToken(bearerInput, refreshInput) {
 
             DEFAULT_TOKEN.bearer = newBearer;
             DEFAULT_TOKEN.refresh_token = newRefresh;
+
+            // Update lifetime tracking
+            updateTokenLifetimeTracking(newBearer, newRefresh);
 
             console.log(`[TMC] Specific token refreshed! ${humanExpiry(newExpiry)}`);
             return {
@@ -496,6 +585,7 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
                 refresh: newRefresh,
                 addedAt: Date.now(),
                 expiresAt: newExpiry,
+                refreshExpiresAt: newRefresh ? getTokenExpiryMs(newRefresh) : 0,
                 id: '',
                 userId: 'device_auth',
                 username: 'DeviceAuth'
@@ -504,6 +594,9 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
             // Update default
             DEFAULT_TOKEN.bearer = newBearer;
             if (newRefresh) DEFAULT_TOKEN.refresh_token = newRefresh;
+
+            // Update lifetime tracking
+            updateTokenLifetimeTracking(newBearer, newRefresh);
 
             console.log(`[TMC] Device auth token generated! ${humanExpiry(newExpiry)}`);
             return {
@@ -529,40 +622,113 @@ async function refreshTokenInStock() {
             bearer: DEFAULT_TOKEN.bearer,
             refresh: DEFAULT_TOKEN.refresh_token,
             addedAt: Date.now(),
-            expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer)
+            expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer),
+            refreshExpiresAt: getTokenExpiryMs(DEFAULT_TOKEN.refresh_token)
         });
-        return;
+        return { success: true };
     }
     const tokenObj = tokenStock[0];
-    if (!tokenObj.refresh) return;
+    if (!tokenObj.refresh) {
+        console.log('[TMC] No refresh token in stock!');
+        return { success: false, error: 'No refresh token' };
+    }
     try {
         const refreshResult = await refreshToken(tokenObj.refresh);
-        if (refreshResult.success) {
-            console.log('[TMC] Token refreshed');
+        if (refreshResult && refreshResult.success) {
+            console.log(`[TMC] Token refreshed — access: ${humanExpiry(refreshResult.expiresAt)}, refresh: ${humanExpiry(refreshResult.refreshExpiresAt)}`);
+            return refreshResult;
+        } else {
+            console.log(`[TMC] Refresh failed: ${refreshResult ? refreshResult.error : 'unknown'}`);
+            return refreshResult || { success: false, error: 'unknown' };
         }
-    } catch (err) {}
+    } catch (err) {
+        console.log(`[TMC] Refresh exception: ${err.message}`);
+        return { success: false, error: err.message };
+    }
 }
 
-// --- AUTO-REFRESH (1-MINUTE INTERVAL) ---
+// --- SMART AUTO-REFRESH ---
 function scheduleNextRefresh() {
     if (refreshInterval) clearTimeout(refreshInterval);
-    const delay = 1 * 60 * 1000;
+    
+    const delay = getOptimalRefreshDelay();
+    const accessTimeLeft = tokenLifetime.accessExpiresAt - Date.now();
+    const refreshTimeLeft = tokenLifetime.refreshExpiresAt - Date.now();
+    
+    // If refresh token is expired, stop trying
+    if (tokenLifetime.refreshExpiresAt > 0 && refreshTimeLeft <= 0) {
+        console.log('[TMC] !! REFRESH TOKEN EXPIRED — bot needs fresh device auth to continue !!');
+        console.log('[TMC] !! All future refresh attempts will fail until new credentials are provided !!');
+        return;
+    }
+    
+    // If access token is still fresh, wait longer
+    let actualDelay = delay;
+    if (accessTimeLeft > 0) {
+        // Refresh when 40% of lifetime remains, minimum 30s
+        const refreshAt = Math.floor(accessTimeLeft * 0.4);
+        actualDelay = Math.max(30000, Math.min(refreshAt, 30 * 60 * 1000));
+    } else {
+        // Token expired, try again in 30 seconds
+        actualDelay = 30000;
+        console.log('[TMC] Access token expired! Retrying in 30s...');
+    }
+    
+    // Warn if refresh token is getting low
+    if (tokenLifetime.refreshExpiresAt > 0) {
+        const refreshMinsLeft = Math.round(refreshTimeLeft / 60000);
+        if (refreshMinsLeft < 30 && refreshMinsLeft > 0) {
+            console.log(`[TMC] !! REFRESH TOKEN LOW: ${refreshMinsLeft} minutes left !!`);
+            // More aggressive refresh when refresh token is low
+            actualDelay = Math.min(actualDelay, 30000);
+        }
+        if (refreshMinsLeft < 5 && refreshMinsLeft > 0) {
+            console.log(`[TMC] !! REFRESH TOKEN CRITICAL: ${refreshMinsLeft} minutes left !!`);
+        }
+    }
+    
+    console.log(`[TMC] Next refresh in ${Math.round(actualDelay/1000)}s (${formatRemainingTime(tokenLifetime.accessExpiresAt)} access left)`);
+    
     refreshInterval = setTimeout(async () => {
         refreshInterval = null;
         if (isRefreshing) { scheduleNextRefresh(); return; }
         if (!apiWorking) await findWorkingApiUrl();
-        await refreshTokenInStock();
-        scheduleNextRefresh();
-    }, delay);
+        
+        const result = await refreshTokenInStock();
+        
+        if (!result || !result.success) {
+            refreshRetryCount++;
+            const retryDelay = Math.min(30000 * refreshRetryCount, 5 * 60 * 1000);
+            console.log(`[TMC] Refresh failed (attempt ${refreshRetryCount}), retrying in ${Math.round(retryDelay/1000)}s`);
+            refreshInterval = setTimeout(async () => {
+                refreshInterval = null;
+                if (!apiWorking) await findWorkingApiUrl();
+                await refreshTokenInStock();
+                scheduleNextRefresh();
+            }, retryDelay);
+        } else {
+            refreshRetryCount = 0;
+            scheduleNextRefresh();
+        }
+    }, actualDelay);
 }
 
 function startAutoRefresh() {
-    console.log('[TMC] Auto-refresh every 1 minute');
+    console.log('[TMC] Smart auto-refresh starting');
     isRefreshing = false;
     failedQueue = [];
+    refreshRetryCount = 0;
+    
     setTimeout(async () => {
         await findWorkingApiUrl();
-        await refreshTokenInStock();
+        
+        // Initialize token lifetime tracking
+        updateTokenLifetimeTracking(DEFAULT_TOKEN.bearer, DEFAULT_TOKEN.refresh_token);
+        
+        // Do first refresh immediately
+        const result = await refreshTokenInStock();
+        
+        // Start smart scheduling
         scheduleNextRefresh();
     }, 5000);
 }
@@ -584,6 +750,7 @@ async function refreshAllTokens() {
                 tokenStock[i].bearer = res.bearer;
                 tokenStock[i].refresh = res.refresh;
                 tokenStock[i].expiresAt = res.expiresAt;
+                tokenStock[i].refreshExpiresAt = res.refreshExpiresAt || 0;
                 successCount++;
             } else {
                 failCount++;
@@ -638,7 +805,8 @@ async function processTokenGeneration(interaction) {
                 bearer: DEFAULT_TOKEN.bearer,
                 refresh: DEFAULT_TOKEN.refresh_token,
                 addedAt: Date.now(),
-                expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer)
+                expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer),
+                refreshExpiresAt: getTokenExpiryMs(DEFAULT_TOKEN.refresh_token)
             });
         }
         
@@ -918,7 +1086,8 @@ client.once('ready', async () => {
         bearer: DEFAULT_TOKEN.bearer,
         refresh: DEFAULT_TOKEN.refresh_token,
         addedAt: Date.now(),
-        expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer)
+        expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer),
+        refreshExpiresAt: getTokenExpiryMs(DEFAULT_TOKEN.refresh_token)
     }];
 
     await findWorkingApiUrl();
@@ -977,9 +1146,18 @@ client.on('interactionCreate', async interaction => {
             const { commandName } = interaction;
 
             if (commandName === 'dashboard') {
+                const health = getRefreshHealthStatus();
+                const accessStatus = health.accessRemainingMs > 0 ? `Access: **${formatRemainingTime(tokenLifetime.accessExpiresAt)}**` : 'Access: **EXPIRED**';
+                const refreshStatus = health.refreshRemainingMs > 0 ? `Refresh: **${formatRemainingTime(tokenLifetime.refreshExpiresAt)}**` : 'Refresh: **EXPIRED**';
+                
                 const embed = new EmbedBuilder()
-                    .setDescription(`**TMC Gen**\n\nGenerate, refresh, and manage your tokens.`)
-                    .setColor(0x5865F2)
+                    .setDescription(
+                        `**TMC Gen**\n\n` +
+                        `Generate, refresh, and manage your tokens.\n\n` +
+                        `${accessStatus}\n${refreshStatus}\n` +
+                        `Refreshes done: **${health.refreshesDone}**`
+                    )
+                    .setColor(health.accessExpired ? 0xED4245 : 0x2ECC71)
                     .setFooter({ text: `TMC Gen` });
 
                 const row1 = new ActionRowBuilder().addComponents(
@@ -1006,7 +1184,15 @@ client.on('interactionCreate', async interaction => {
                         .setEmoji('⚙️')
                 );
 
-                return interaction.reply({ embeds: [embed], components: [row1, row2, row3] });
+                const row4 = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('force_refresh_btn')
+                        .setLabel('Force Refresh Now')
+                        .setStyle(ButtonStyle.Danger)
+                        .setEmoji('⚡')
+                );
+
+                return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4] });
             }
 
             if (commandName === 'cleandms') {
@@ -1054,6 +1240,35 @@ client.on('interactionCreate', async interaction => {
             if (interaction.customId === 'device_gen_btn') {
                 return await handleDeviceGenButton(interaction);
             }
+
+            if (interaction.customId === 'force_refresh_btn') {
+                await interaction.deferReply({ flags: 64 });
+                try {
+                    if (isRefreshing) {
+                        return interaction.editReply({ content: 'A refresh is already in progress...' });
+                    }
+                    const result = await refreshTokenInStock();
+                    if (result && result.success) {
+                        const health = getRefreshHealthStatus();
+                        const embed = new EmbedBuilder()
+                            .setDescription(
+                                `Force refresh successful!\n\n` +
+                                `Access: **${formatRemainingTime(tokenLifetime.accessExpiresAt)}**\n` +
+                                `Refresh: **${formatRemainingTime(tokenLifetime.refreshExpiresAt)}**\n` +
+                                `Total refreshes: **${health.refreshesDone}**`
+                            )
+                            .setColor(0x2ECC71)
+                            .setFooter({ text: `TMC Gen` });
+                        return interaction.editReply({ embeds: [embed] });
+                    } else {
+                        return interaction.editReply({
+                            content: `Refresh failed: ${result ? result.error : 'unknown error'}`
+                        });
+                    }
+                } catch (err) {
+                    return interaction.editReply({ content: 'Error during force refresh.' });
+                }
+            }
         }
 
         // --- MODAL SUBMISSIONS ---
@@ -1077,17 +1292,40 @@ client.on('interactionCreate', async interaction => {
 // --- HTTP SERVER ---
 const server = http.createServer((req, res) => {
     if (req.url === '/health' || req.url === '/') {
+        const health = getRefreshHealthStatus();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             status: 'ok', 
             bot: client.user ? 'online' : 'offline', 
             stock: tokenStock.length,
+            accessExpiresIn: health.accessRemainingMs > 0 ? Math.round(health.accessRemainingMs / 1000) + 's' : 'expired',
+            refreshExpiresIn: health.refreshRemainingMs > 0 ? Math.round(health.refreshRemainingMs / 1000) + 's' : (health.refreshExpired ? 'expired' : 'unknown'),
+            refreshesDone: health.refreshesDone,
             timestamp: Date.now() 
         }));
         return;
     }
+    if (req.url === '/status') {
+        const health = getRefreshHealthStatus();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            access: {
+                expiresAt: tokenLifetime.accessExpiresAt,
+                remainingMs: health.accessRemainingMs,
+                remainingHuman: health.accessRemainingMs > 0 ? formatRemainingTime(tokenLifetime.accessExpiresAt) : 'EXPIRED'
+            },
+            refresh: {
+                expiresAt: tokenLifetime.refreshExpiresAt,
+                remainingMs: health.refreshRemainingMs,
+                remainingHuman: health.refreshRemainingMs > 0 ? formatRemainingTime(tokenLifetime.refreshExpiresAt) : (health.refreshExpired ? 'EXPIRED' : 'unknown')
+            },
+            refreshesDone: health.refreshesDone,
+            lastRefreshAgoMs: health.lastSuccessAgo
+        }));
+        return;
+    }
     res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
+    res.end('Not Found — Available: /, /health, /status');
 });
 
 const PORT = process.env.PORT || 10000;
