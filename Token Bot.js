@@ -43,9 +43,17 @@ const NAKAMA_SERVER = 'https://animalcompany.us-east1.nakamacloud.io';
 const NAKAMA_SERVER_KEY = '6URuTSlDKKfYbuDW';
 const API_URLS = [ NAKAMA_SERVER ];
 
+// --- DEVICE AUTH CONFIG (for auto re-auth when refresh token dies) ---
+// DEVICE_ID = your persistent hardware GUID (from yaml: a60f8dba...)
+// DEVICE_TOKEN = optional — if empty, bot will use DEVICE_ID as the token
+//                (Nakama device auth just needs a stable unique ID)
+const DEVICE_TOKEN = process.env.DEVICE_TOKEN || '';
+const DEVICE_ID = process.env.DEVICE_ID || '';
+
 let ACTIVE_API_URL = API_URLS[0];
 let apiWorking = false;
 let isRefreshing = false;
+let isReAuthing = false;
 let failedQueue = [];
 let tokenStock = [];
 const cooldowns = new Map();
@@ -64,8 +72,8 @@ let tokenLifetime = {
 
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIzZWZhZjYzOC1hMDJlLTQ2YTMtOTVhNS0wM2ZkMTYzMWQxMTEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjE4MWNkZDFiNjI4ODRlYjg5ODMyZDdmZWQyY2ZhYjliIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NDYwMzUsImlhdCI6MTc4ODY0MjQzNX0.ljdY4leYMtBRgcgLZ5Mdd3wibU0y2i_CH_E2mHXHkNk",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIzZWZhZjYzOC1hMDJlLTQ2YTMtOTVhNS0wM2ZkMTYzMWQxMTEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjE4MWNkZDFiNjI4ODRlYjg5ODMyZDdmZWQyY2ZhYjliIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NjQwMzUsImlhdCI6MTc4ODY0MjQzNX0.mWos6tiuYXbDTS3nujchU14blsyCYj0NHVk74fzMSc0"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJiY2Q3OTcwZi0yOGVlLTQ0MGItOGZmMi04NzFkZDY0MDYzNGQiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImRlZjkzN2JlMDM2ZjQzMTRhMDc5MTcyNTc2MWIxMWExIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1ODQ1MjIsImlhdCI6MTc4ODU4MDkyMn0.he0WkQLOIYiskSiTlPQ5rqXXcENff4wU__WTyQoWULY",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJiY2Q3OTcwZi0yOGVlLTQ0MGItOGZmMi04NzFkZDY0MDYzNGQiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImRlZjkzN2JlMDM2ZjQzMTRhMDc5MTcyNTc2MWIxMWExIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2MDI1MjIsImlhdCI6MTc4ODU4MDkyMn0.rEZgUvaBE6usKd5W34iknA-FxGv79L1c6pGl0lO3usQ"
 };
 
 // --- JWT HELPERS ---
@@ -597,12 +605,11 @@ async function refreshSpecificToken(bearerInput, refreshInput) {
 
 // --- GENERATE TOKEN FROM DEVICE AUTH ---
 async function generateTokenFromDevice(deviceToken, deviceID) {
-    // Validate inputs before hitting the API
-    if (!isValidJwt(deviceToken)) {
-        return { success: false, error: 'Invalid device token format.' };
+    if (!deviceToken || deviceToken.length < 10) {
+        return { success: false, error: 'Device token is too short or missing.' };
     }
-    if (!isAllowedStringInput(deviceID, 200)) {
-        return { success: false, error: 'Invalid device ID format.' };
+    if (!deviceID || deviceID.length < 5) {
+        return { success: false, error: 'Device ID is too short or missing.' };
     }
     try {
         console.log('[TMC] Generating token from device auth...');
@@ -696,6 +703,192 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
     }
 }
 
+// --- AUTO RE-AUTH FROM DEVICE (when refresh token dies) ---
+async function autoReAuthFromDevice() {
+    // Need at minimum a DEVICE_ID — if no DEVICE_TOKEN, we use DEVICE_ID as the token
+    // (Nakama device auth just needs a stable unique identifier)
+    if (!DEVICE_ID) {
+        console.log('[TMC] !! No DEVICE_ID env var set — cannot auto re-auth !!');
+        console.log('[TMC] !! Set DEVICE_ID in your environment to enable auto re-auth !!');
+        console.log('[TMC] !! Your device ID from yaml: a60f8dba6c418f905d889bca18d7aa36c9343c23 !!');
+        return { success: false, error: 'No DEVICE_ID configured. Set DEVICE_ID env var.' };
+    }
+    
+    // Use DEVICE_TOKEN if provided, otherwise fall back to DEVICE_ID as the token
+    const authToken = DEVICE_TOKEN || DEVICE_ID;
+    
+    if (isReAuthing) {
+        console.log('[TMC] Re-auth already in progress, skipping...');
+        return { success: false, error: 'Re-auth in progress' };
+    }
+    
+    isReAuthing = true;
+    console.log('[TMC] ==========================================');
+    console.log('[TMC] AUTO RE-AUTH: Refresh token dead, re-authenticating via device auth...');
+    console.log('[TMC] ==========================================');
+    
+    try {
+        // Try all URLs
+        const urlsToTry = [...API_URLS];
+        if (ACTIVE_API_URL && urlsToTry.includes(ACTIVE_API_URL)) {
+            urlsToTry.splice(urlsToTry.indexOf(ACTIVE_API_URL), 1);
+            urlsToTry.unshift(ACTIVE_API_URL);
+        }
+        
+        for (const url of urlsToTry) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const authUrl = `${url}/v2/account/authenticate/device`;
+                    console.log(`[TMC] Re-auth attempt ${attempt}/3 at: ${authUrl}`);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 20000);
+                    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+
+                    const body = {
+                        token: authToken,
+                        vars: {
+                            clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
+                            deviceID: DEVICE_ID
+                        }
+                    };
+
+                    const response = await fetch(`${authUrl}?create=true&sync=false`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'UnityPlayer/6000.3.12f1 (UnityWebRequest/1.0, libcurl/8.10.1-DEV)',
+                            'Connection': 'keep-alive',
+                            'Accept': '*/*',
+                            'Accept-Encoding': 'deflate, gzip',
+                            'Authorization': serverKeyAuth
+                        },
+                        body: JSON.stringify(body),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+
+                    let data = null;
+                    let rawBody = '';
+                    try {
+                        rawBody = await response.text();
+                        data = JSON.parse(rawBody);
+                    } catch (parseErr) {
+                        console.log(`[TMC] ${url} (attempt ${attempt}) - Non-JSON (status ${response.status}): ${rawBody.substring(0, 150)}`);
+                        if (response.status >= 500 && attempt < 3) {
+                            await new Promise(r => setTimeout(r, 3000));
+                            continue;
+                        }
+                        break;
+                    }
+
+                    console.log(`[TMC] Re-auth response (status ${response.status}):`, JSON.stringify(data).substring(0, 300));
+
+                    let newBearer = null;
+                    let newRefresh = null;
+
+                    if (data.token) {
+                        newBearer = data.token;
+                        newRefresh = data.refresh_token || null;
+                    } else if (data.access_token) {
+                        newBearer = data.access_token;
+                        newRefresh = data.refresh_token || null;
+                    } else if (data.bearer) {
+                        newBearer = data.bearer;
+                        newRefresh = data.refresh_token || null;
+                    }
+
+                    if (response.status === 200 && newBearer) {
+                        const newExpiry = getTokenExpiryMs(newBearer);
+                        const newRefreshExpiry = newRefresh ? getTokenExpiryMs(newRefresh) : 0;
+
+                        if (newExpiry <= Date.now()) {
+                            console.log(`[TMC] ${url} - Re-auth returned expired token, skipping`);
+                            continue;
+                        }
+
+                        console.log(`[TMC] ==========================================`);
+                        console.log(`[TMC] RE-AUTH SUCCESSFUL!`);
+                        console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
+                        if (newRefresh) console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
+                        console.log(`[TMC] Access: ${humanExpiry(newExpiry)}, Refresh: ${newRefresh ? humanExpiry(newRefreshExpiry) : 'none'}`);
+                        console.log(`[TMC] ==========================================`);
+
+                        DEFAULT_TOKEN.bearer = newBearer;
+                        if (newRefresh) DEFAULT_TOKEN.refresh_token = newRefresh;
+                        ACTIVE_API_URL = url;
+                        apiWorking = true;
+                        refreshRetryCount = 0;
+                        isReAuthing = false;
+
+                        // Update token lifetime tracking
+                        updateTokenLifetimeTracking(newBearer, newRefresh);
+
+                        // Replace or add to stock
+                        if (tokenStock.length > 0) {
+                            tokenStock[0] = {
+                                bearer: newBearer,
+                                refresh: newRefresh,
+                                addedAt: Date.now(),
+                                expiresAt: newExpiry,
+                                refreshExpiresAt: newRefreshExpiry,
+                                id: tokenStock[0].id,
+                                userId: tokenStock[0].userId,
+                                username: tokenStock[0].username
+                            };
+                        } else {
+                            tokenStock.push({
+                                bearer: newBearer,
+                                refresh: newRefresh,
+                                addedAt: Date.now(),
+                                expiresAt: newExpiry,
+                                refreshExpiresAt: newRefreshExpiry,
+                                id: '',
+                                userId: 'device_auth',
+                                username: 'AutoReAuth'
+                            });
+                        }
+
+                        // Process any queued requests
+                        processQueue(null, { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry, newToken: true });
+                        
+                        return { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry };
+                    } else {
+                        const errMsg = data ? (data.message || data.error || JSON.stringify(data)) : 'no body';
+                        console.log(`[TMC] ${url} - Re-auth failed (${response.status}): ${errMsg}`);
+                        
+                        if (response.status === 401) {
+                            console.log(`[TMC] !! DEVICE TOKEN MAY BE REVOKED — check your DEVICE_TOKEN env var !!`);
+                        }
+                        
+                        if (response.status === 429) {
+                            console.log(`[TMC] Rate limited, waiting 5s...`);
+                            await new Promise(r => setTimeout(r, 5000));
+                        } else if (attempt < 3) {
+                            await new Promise(r => setTimeout(r, 3000));
+                        }
+                    }
+                } catch (err) {
+                    const errMsg = err.name === 'AbortError' ? 'timeout (20s)' : err.message;
+                    console.log(`[TMC] ${url} (attempt ${attempt}) - ${errMsg}`);
+                    if (attempt < 3) {
+                        await new Promise(r => setTimeout(r, 3000));
+                    }
+                }
+            }
+        }
+
+        isReAuthing = false;
+        console.log('[TMC] !! ALL RE-AUTH ATTEMPTS FAILED !!');
+        console.log('[TMC] !! Check DEVICE_TOKEN and DEVICE_ID env vars !!');
+        processQueue(new Error('Device re-auth failed'), null);
+        return { success: false, error: 'All re-auth attempts failed' };
+    } catch (err) {
+        console.error('[TMC] Re-auth error:', err.message);
+        isReAuthing = false;
+        return { success: false, error: err.message };
+    }
+}
+
 // --- REFRESH TOKEN IN STOCK ---
 async function refreshTokenInStock() {
     if (tokenStock.length === 0) {
@@ -736,10 +929,29 @@ function scheduleNextRefresh() {
     const accessTimeLeft = tokenLifetime.accessExpiresAt - Date.now();
     const refreshTimeLeft = tokenLifetime.refreshExpiresAt - Date.now();
     
-    // If refresh token is expired, stop trying
-    if (tokenLifetime.refreshExpiresAt > 0 && refreshTimeLeft <= 0) {
-        console.log('[TMC] !! REFRESH TOKEN EXPIRED — bot needs fresh device auth to continue !!');
-        console.log('[TMC] !! All future refresh attempts will fail until new credentials are provided !!');
+    // If refresh token is expired or about to expire, trigger re-auth instead of giving up
+    if (tokenLifetime.refreshExpiresAt > 0 && refreshTimeLeft <= 30 * 60 * 1000) {
+        const minsLeft = Math.round(refreshTimeLeft / 60000);
+        if (refreshTimeLeft <= 0) {
+            console.log('[TMC] Refresh token expired — triggering auto re-auth...');
+        } else {
+            console.log(`[TMC] Refresh token low (${minsLeft} min left) — triggering auto re-auth...`);
+        }
+        
+        refreshInterval = setTimeout(async () => {
+            refreshInterval = null;
+            if (isReAuthing) { scheduleNextRefresh(); return; }
+            if (!apiWorking) await findWorkingApiUrl();
+            
+            const reAuthResult = await autoReAuthFromDevice();
+            if (reAuthResult && reAuthResult.success) {
+                console.log('[TMC] Re-auth successful, resuming normal refresh cycle');
+                refreshRetryCount = 0;
+            } else {
+                console.log('[TMC] Re-auth failed, retrying in 60s...');
+            }
+            scheduleNextRefresh();
+        }, isReAuthing ? 5000 : 1000);
         return;
     }
     
@@ -758,13 +970,8 @@ function scheduleNextRefresh() {
     // Warn if refresh token is getting low
     if (tokenLifetime.refreshExpiresAt > 0) {
         const refreshMinsLeft = Math.round(refreshTimeLeft / 60000);
-        if (refreshMinsLeft < 30 && refreshMinsLeft > 0) {
-            console.log(`[TMC] !! REFRESH TOKEN LOW: ${refreshMinsLeft} minutes left !!`);
-            // More aggressive refresh when refresh token is low
-            actualDelay = Math.min(actualDelay, 30000);
-        }
-        if (refreshMinsLeft < 5 && refreshMinsLeft > 0) {
-            console.log(`[TMC] !! REFRESH TOKEN CRITICAL: ${refreshMinsLeft} minutes left !!`);
+        if (refreshMinsLeft < 60 && refreshMinsLeft > 30) {
+            console.log(`[TMC] Refresh token: ${refreshMinsLeft} min remaining`);
         }
     }
     
@@ -779,12 +986,29 @@ function scheduleNextRefresh() {
         
         if (!result || !result.success) {
             refreshRetryCount++;
+            // If refresh failed and it looks like a 401/token issue, try re-auth
+            const errMsg = result ? (result.error || '') : '';
+            if (errMsg.includes('401') || errMsg.includes('expired') || errMsg.includes('invalid')) {
+                console.log('[TMC] Refresh failed with auth error — triggering auto re-auth...');
+                refreshRetryCount = 0;
+                await autoReAuthFromDevice();
+                scheduleNextRefresh();
+                return;
+            }
             const retryDelay = Math.min(30000 * refreshRetryCount, 5 * 60 * 1000);
             console.log(`[TMC] Refresh failed (attempt ${refreshRetryCount}), retrying in ${Math.round(retryDelay/1000)}s`);
             refreshInterval = setTimeout(async () => {
                 refreshInterval = null;
                 if (!apiWorking) await findWorkingApiUrl();
-                await refreshTokenInStock();
+                
+                const retryResult = await refreshTokenInStock();
+                if (!retryResult || !retryResult.success) {
+                    const retryErr = retryResult ? (retryResult.error || '') : '';
+                    if (retryErr.includes('401') || retryErr.includes('expired') || retryErr.includes('invalid')) {
+                        console.log('[TMC] Retry also failed with auth error — triggering auto re-auth...');
+                        await autoReAuthFromDevice();
+                    }
+                }
                 scheduleNextRefresh();
             }, retryDelay);
         } else {
@@ -796,7 +1020,9 @@ function scheduleNextRefresh() {
 
 function startAutoRefresh() {
     console.log('[TMC] Smart auto-refresh starting');
+    console.log(`[TMC] Device auth: ${DEVICE_ID ? (DEVICE_TOKEN ? 'DEVICE_TOKEN + DEVICE_ID set' : 'DEVICE_ID set (using as token)') : 'NOT SET — set DEVICE_ID env var for auto re-auth'}`);
     isRefreshing = false;
+    isReAuthing = false;
     failedQueue = [];
     refreshRetryCount = 0;
     
@@ -806,8 +1032,21 @@ function startAutoRefresh() {
         // Initialize token lifetime tracking
         updateTokenLifetimeTracking(DEFAULT_TOKEN.bearer, DEFAULT_TOKEN.refresh_token);
         
-        // Do first refresh immediately
-        const result = await refreshTokenInStock();
+        // Check if current refresh token is already expired — re-auth immediately
+        const refreshTimeLeft = tokenLifetime.refreshExpiresAt - Date.now();
+        if (refreshTimeLeft <= 0) {
+            console.log('[TMC] Refresh token already expired on startup — re-authenticating...');
+            const reAuthResult = await autoReAuthFromDevice();
+            if (!reAuthResult || !reAuthResult.success) {
+                console.log('[TMC] !! Startup re-auth failed. Bot will not work until device credentials are provided !!');
+            }
+        } else {
+            // Do first refresh to validate session
+            const result = await refreshTokenInStock();
+            if (!result || !result.success) {
+                console.log('[TMC] First refresh failed, will attempt re-auth on next cycle');
+            }
+        }
         
         // Start smart scheduling
         scheduleNextRefresh();
@@ -1095,14 +1334,13 @@ async function processDeviceGenModal(interaction) {
             return interaction.editReply({ content: 'Both device token and device ID are required.' });
         }
 
-        // Validate device token is a proper JWT
-        if (!isValidJwt(deviceToken)) {
-            return interaction.editReply({ content: 'Invalid device token. Must be a valid JWT.' });
+        // Device tokens are hex strings, NOT JWTs
+        if (deviceToken.length < 10) {
+            return interaction.editReply({ content: 'Device token is too short.' });
         }
 
-        // Validate device ID is a reasonable hex-like string (not garbage)
-        if (!isAllowedStringInput(deviceID, 200)) {
-            return interaction.editReply({ content: 'Invalid device ID format.' });
+        if (deviceID.length < 5) {
+            return interaction.editReply({ content: 'Device ID is too short.' });
         }
 
         await interaction.editReply({ content: 'Generating token via device auth...' });
@@ -1230,13 +1468,16 @@ client.on('interactionCreate', async interaction => {
                 const health = getRefreshHealthStatus();
                 const accessStatus = health.accessRemainingMs > 0 ? `Access: **${formatRemainingTime(tokenLifetime.accessExpiresAt)}**` : 'Access: **EXPIRED**';
                 const refreshStatus = health.refreshRemainingMs > 0 ? `Refresh: **${formatRemainingTime(tokenLifetime.refreshExpiresAt)}**` : 'Refresh: **EXPIRED**';
+                const deviceStatus = DEVICE_ID ? (DEVICE_TOKEN ? 'Device Auth: **FULL**' : 'Device Auth: **ID only**') : 'Device Auth: **NOT SET**';
+                const reAuthStatus = isReAuthing ? 'Re-auth: **IN PROGRESS**' : '';
                 
                 const embed = new EmbedBuilder()
                     .setDescription(
                         `**TMC Gen**\n\n` +
                         `Generate, refresh, and manage your tokens.\n\n` +
-                        `${accessStatus}\n${refreshStatus}\n` +
-                        `Refreshes done: **${health.refreshesDone}**`
+                        `${accessStatus}\n${refreshStatus}\n${deviceStatus}` +
+                        (reAuthStatus ? `\n${reAuthStatus}` : '') +
+                        `\nRefreshes done: **${health.refreshesDone}**`
                     )
                     .setColor(health.accessExpired ? 0xED4245 : 0x2ECC71)
                     .setFooter({ text: `TMC Gen` });
