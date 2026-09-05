@@ -901,19 +901,8 @@ async function processDeviceGenModal(interaction) {
 // --- SLASH COMMANDS ---
 const commandsData = [
     new SlashCommandBuilder()
-        .setName('stock')
-        .setDescription('Add token stock (bearer + refresh)')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
         .setName('dashboard')
         .setDescription('Token Generator panel'),
-    new SlashCommandBuilder()
-        .setName('refreshall')
-        .setDescription('Refresh all tokens in stock pool')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
-        .setName('stockcheck')
-        .setDescription('Check current token stock status'),
     new SlashCommandBuilder()
         .setName('cleandms')
         .setDescription('Delete all DM conversations the bot has')
@@ -1020,80 +1009,6 @@ client.on('interactionCreate', async interaction => {
                 return interaction.reply({ embeds: [embed], components: [row1, row2, row3] });
             }
 
-            if (commandName === 'stock') {
-                const modal = new ModalBuilder()
-                    .setCustomId('stock_modal')
-                    .setTitle('Add Token Stock');
-
-                const bearerInput = new TextInputBuilder()
-                    .setCustomId('stock_bearer_input')
-                    .setLabel("ENTER BEARER TOKEN")
-                    .setStyle(TextInputStyle.Paragraph)
-                    .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                    .setRequired(true)
-                    .setMinLength(10)
-                    .setMaxLength(2000);
-
-                const refreshInput = new TextInputBuilder()
-                    .setCustomId('stock_refresh_input')
-                    .setLabel("ENTER REFRESH TOKEN")
-                    .setStyle(TextInputStyle.Paragraph)
-                    .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                    .setRequired(true)
-                    .setMinLength(10)
-                    .setMaxLength(2000);
-
-                modal.addComponents(
-                    new ActionRowBuilder().addComponents(bearerInput),
-                    new ActionRowBuilder().addComponents(refreshInput)
-                );
-                return await interaction.showModal(modal);
-            }
-
-            if (commandName === 'refreshall') {
-                await interaction.deferReply({ flags: 64 });
-                if (tokenStock.length === 0) {
-                    return interaction.editReply({ content: 'No tokens in stock to refresh.' });
-                }
-                
-                await interaction.editReply({ content: `Refreshing all ${tokenStock.length} tokens...` });
-                const { successCount, failCount } = await refreshAllTokens();
-                
-                return interaction.editReply({ 
-                    content: `Refresh complete!\n- Successful: **${successCount}**\n- Failed: **${failCount}**\n- Total Stock: **${tokenStock.length}**` 
-                });
-            }
-
-            if (commandName === 'stockcheck') {
-                await interaction.deferReply({ flags: 64 });
-                
-                if (tokenStock.length === 0) {
-                    return interaction.editReply({ content: 'Stock is empty.' });
-                }
-
-                let description = '';
-                for (let i = 0; i < Math.min(tokenStock.length, 10); i++) {
-                    const t = tokenStock[i];
-                    const expiry = humanExpiry(t.expiresAt);
-                    const isExpired = Date.now() >= t.expiresAt;
-                    description += `**#${i + 1}** ${isExpired ? 'EXPIRED' : expiry}`;
-                    if (t.username) description += ` | ${t.username}`;
-                    description += '\n';
-                }
-
-                if (tokenStock.length > 10) {
-                    description += `\n...and ${tokenStock.length - 10} more`;
-                }
-
-                const embed = new EmbedBuilder()
-                    .setTitle('Token Stock')
-                    .setDescription(description)
-                    .setColor(0x5865F2)
-                    .setFooter({ text: `Total: ${tokenStock.length} | Auto-refresh: ON` });
-
-                return interaction.editReply({ embeds: [embed] });
-            }
-
             if (commandName === 'cleandms') {
                 await interaction.deferReply({ flags: 64 });
 
@@ -1143,32 +1058,6 @@ client.on('interactionCreate', async interaction => {
 
         // --- MODAL SUBMISSIONS ---
         if (interaction.isModalSubmit()) {
-            if (interaction.customId === 'stock_modal') {
-                await interaction.deferReply({ flags: 64 });
-                const bearer = interaction.fields.getTextInputValue('stock_bearer_input').trim();
-                const refresh = interaction.fields.getTextInputValue('stock_refresh_input').trim();
-                
-                if (!bearer || !refresh) {
-                    return interaction.editReply({ content: 'Both tokens required.' });
-                }
-
-                // Validate JWT format
-                if (!isValidJwt(bearer)) {
-                    return interaction.editReply({ content: 'Invalid bearer token. Must be a valid JWT.' });
-                }
-                if (!isValidJwt(refresh)) {
-                    return interaction.editReply({ content: 'Invalid refresh token. Must be a valid JWT.' });
-                }
-                
-                tokenStock.push({
-                    bearer, refresh,
-                    addedAt: Date.now(),
-                    expiresAt: getTokenExpiryMs(bearer)
-                });
-
-                return interaction.editReply({ content: `Token added! Total: \`${tokenStock.length}\`` });
-            }
-
             if (interaction.customId === 'refresh_modal') {
                 return await processRefreshModal(interaction);
             }
