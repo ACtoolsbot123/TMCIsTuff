@@ -1498,39 +1498,7 @@ client.on('interactionCreate', async interaction => {
                         .setEmoji('🔑')
                 );
 
-                const row2 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('refresh_token_btn')
-                        .setLabel('Refresh Token')
-                        .setStyle(ButtonStyle.Primary)
-                        .setEmoji('🔄')
-                );
-
-                const row3 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('device_gen_btn')
-                        .setLabel('Device Auth Gen')
-                        .setStyle(ButtonStyle.Secondary)
-                        .setEmoji('⚙️')
-                );
-
-                const row4 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('force_refresh_btn')
-                        .setLabel('Force Refresh Now')
-                        .setStyle(ButtonStyle.Danger)
-                        .setEmoji('⚡')
-                );
-
-                const row5 = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder()
-                        .setCustomId('update_device_token_btn')
-                        .setLabel('Update Device Token')
-                        .setStyle(ButtonStyle.Secondary)
-                        .setEmoji('🔑')
-                );
-
-                return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4, row5] });
+                return interaction.reply({ embeds: [embed], components: [row1] });
             }
 
             if (commandName === 'cleandms') {
