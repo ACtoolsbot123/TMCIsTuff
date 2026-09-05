@@ -914,6 +914,10 @@ const commandsData = [
     new SlashCommandBuilder()
         .setName('stockcheck')
         .setDescription('Check current token stock status'),
+    new SlashCommandBuilder()
+        .setName('cleandms')
+        .setDescription('Delete all DM conversations the bot has')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(cmd => cmd.toJSON());
 
 // --- READY ---
@@ -1088,6 +1092,37 @@ client.on('interactionCreate', async interaction => {
                     .setFooter({ text: `Total: ${tokenStock.length} | Auto-refresh: ON` });
 
                 return interaction.editReply({ embeds: [embed] });
+            }
+
+            if (commandName === 'cleandms') {
+                await interaction.deferReply({ flags: 64 });
+
+                // Fetch all DM channels the bot has open
+                let deletedCount = 0;
+                let failedCount = 0;
+
+                // Get all users the bot shares a DM with via cache
+                const dmChannels = client.channels.cache.filter(ch => ch.type === 1); // DM type = 1
+                const total = dmChannels.size;
+
+                if (total === 0) {
+                    return interaction.editReply({ content: 'No open DM conversations found.' });
+                }
+
+                await interaction.editReply({ content: `Found ${total} DM conversations. Deleting...` });
+
+                for (const [, channel] of dmChannels) {
+                    try {
+                        await channel.delete('Clean DMs command');
+                        deletedCount++;
+                    } catch (err) {
+                        failedCount++;
+                    }
+                }
+
+                return interaction.editReply({
+                    content: `DM cleanup complete!\n- Deleted: **${deletedCount}**\n- Failed: **${failedCount}**\n- Total found: **${total}**`
+                });
             }
         }
 
