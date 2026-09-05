@@ -735,10 +735,17 @@ async function autoReAuthFromDevice() {
             urlsToTry.unshift(ACTIVE_API_URL);
         }
         
+        // Try both auth endpoints — game uses /authenticate/steam, standard nakama uses /authenticate/device
+        const authEndpoints = [
+            '/v2/account/authenticate/steam',
+            '/v2/account/authenticate/device'
+        ];
+
         for (const url of urlsToTry) {
-            for (let attempt = 1; attempt <= 3; attempt++) {
+            for (const endpoint of authEndpoints) {
+                for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
-                    const authUrl = `${url}/v2/account/authenticate/device`;
+                    const authUrl = `${url}${endpoint}`;
                     console.log(`[TMC] Re-auth attempt ${attempt}/3 at: ${authUrl}`);
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 20000);
@@ -873,6 +880,7 @@ async function autoReAuthFromDevice() {
                     if (attempt < 3) {
                         await new Promise(r => setTimeout(r, 3000));
                     }
+                }
                 }
             }
         }
@@ -1514,7 +1522,15 @@ client.on('interactionCreate', async interaction => {
                         .setEmoji('⚡')
                 );
 
-                return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4] });
+                const row5 = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('update_device_token_btn')
+                        .setLabel('Update Device Token')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setEmoji('🔑')
+                );
+
+                return interaction.reply({ embeds: [embed], components: [row1, row2, row3, row4, row5] });
             }
 
             if (commandName === 'cleandms') {
@@ -1593,7 +1609,6 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // --- MODAL SUBMISSIONS ---
         if (interaction.isModalSubmit()) {
             if (interaction.customId === 'refresh_modal') {
                 return await processRefreshModal(interaction);
