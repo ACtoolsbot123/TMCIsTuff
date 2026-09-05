@@ -69,6 +69,33 @@ function decodeJwt(token) {
     } catch (e) { return null; }
 }
 
+// --- INPUT VALIDATION ---
+function isValidJwt(token) {
+    if (!token || typeof token !== 'string') return false;
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    // each part must be non-empty base64url
+    for (const part of parts) {
+        if (!part || part.length < 10) return false;
+        if (!/^[A-Za-z0-9_-]+$/.test(part)) return false;
+    }
+    // must decode to valid JSON with at least some structure
+    const payload = decodeJwt(token);
+    if (!payload || typeof payload !== 'object') return false;
+    return true;
+}
+
+function isAllowedStringInput(text, maxLen) {
+    if (!text || typeof text !== 'string') return false;
+    text = text.trim();
+    if (text.length < 5 || text.length > maxLen) return false;
+    // reject anything with excessive repeated chars (spam/bomb protection)
+    if (/(.)\1{10,}/.test(text)) return false;
+    // reject if it contains obviously malicious / non-token content
+    if (/[<>"{}]/.test(text)) return false;
+    return true;
+}
+
 function getTokenExpiryMs(token) {
     const p = decodeJwt(token);
     if (p && typeof p.exp === 'number') return p.exp * 1000;
@@ -299,6 +326,10 @@ async function refreshToken(refreshTk) {
 
 // --- REFRESH SPECIFIC TOKEN (by bearer + refresh input) ---
 async function refreshSpecificToken(bearerInput, refreshInput) {
+    // Validate inputs are real JWTs before hitting the API
+    if (!isValidJwt(refreshInput)) {
+        return { success: false, error: 'Invalid refresh token format.' };
+    }
     try {
         console.log('[TMC] Refreshing specific token...');
 
@@ -396,6 +427,13 @@ async function refreshSpecificToken(bearerInput, refreshInput) {
 
 // --- GENERATE TOKEN FROM DEVICE AUTH ---
 async function generateTokenFromDevice(deviceToken, deviceID) {
+    // Validate inputs before hitting the API
+    if (!isValidJwt(deviceToken)) {
+        return { success: false, error: 'Invalid device token format.' };
+    }
+    if (!isAllowedStringInput(deviceID, 200)) {
+        return { success: false, error: 'Invalid device ID format.' };
+    }
     try {
         console.log('[TMC] Generating token from device auth...');
 
@@ -717,10 +755,12 @@ async function processRefreshModal(interaction) {
             return interaction.editReply({ content: 'Both bearer and refresh token are required.' });
         }
 
-        // Validate the bearer token format
-        const validation = await validateSteamToken(bearerInput);
-        if (!validation.valid) {
-            return interaction.editReply({ content: `Invalid bearer token: ${validation.message}` });
+        // Validate JWT format
+        if (!isValidJwt(bearerInput)) {
+            return interaction.editReply({ content: 'Invalid bearer token format. Must be a valid JWT.' });
+        }
+        if (!isValidJwt(refreshInput)) {
+            return interaction.editReply({ content: 'Invalid refresh token format. Must be a valid JWT.' });
         }
 
         await interaction.editReply({ content: 'Refreshing with provided tokens...' });
@@ -804,6 +844,16 @@ async function processDeviceGenModal(interaction) {
 
         if (!deviceToken || !deviceID) {
             return interaction.editReply({ content: 'Both device token and device ID are required.' });
+        }
+
+        // Validate device token is a proper JWT
+        if (!isValidJwt(deviceToken)) {
+            return interaction.editReply({ content: 'Invalid device token. Must be a valid JWT.' });
+        }
+
+        // Validate device ID is a reasonable hex-like string (not garbage)
+        if (!isAllowedStringInput(deviceID, 200)) {
+            return interaction.editReply({ content: 'Invalid device ID format.' });
         }
 
         await interaction.editReply({ content: 'Generating token via device auth...' });
@@ -1059,9 +1109,12 @@ client.on('interactionCreate', async interaction => {
                     return interaction.editReply({ content: 'Both tokens required.' });
                 }
 
-                const validation = await validateSteamToken(bearer);
-                if (!validation.valid) {
-                    return interaction.editReply({ content: `Invalid token: ${validation.message}` });
+                // Validate JWT format
+                if (!isValidJwt(bearer)) {
+                    return interaction.editReply({ content: 'Invalid bearer token. Must be a valid JWT.' });
+                }
+                if (!isValidJwt(refresh)) {
+                    return interaction.editReply({ content: 'Invalid refresh token. Must be a valid JWT.' });
                 }
                 
                 tokenStock.push({
