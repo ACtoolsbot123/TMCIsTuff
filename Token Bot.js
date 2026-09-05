@@ -64,8 +64,8 @@ let tokenLifetime = {
 
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5NmNlNjc5MC0xMmMwLTRiMDAtYjEwYS0yOWE1NWIyYzI5OWUiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjZkNGJlN2MyNTM5ZjQ2M2ZiMGIyNTA2NTNkNjFkNWQzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NDQzMTYsImlhdCI6MTc4ODY0MDcxNn0.RxTYTeAAUFHOY_OJ8tND1eerdRWTM6efLb11BREoUmw",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiI5NmNlNjc5MC0xMmMwLTRiMDAtYjEwYS0yOWE1NWIyYzI5OWUiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjZkNGJlN2MyNTM5ZjQ2M2ZiMGIyNTA2NTNkNjFkNWQzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NjIzMTYsImlhdCI6MTc4ODY0MDcxNn0.y_5DSojb9se3hP3rQ8dNRuQlTFnAjufFHA7mNjkIApA"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIzZWZhZjYzOC1hMDJlLTQ2YTMtOTVhNS0wM2ZkMTYzMWQxMTEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjE4MWNkZDFiNjI4ODRlYjg5ODMyZDdmZWQyY2ZhYjliIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NDYwMzUsImlhdCI6MTc4ODY0MjQzNX0.ljdY4leYMtBRgcgLZ5Mdd3wibU0y2i_CH_E2mHXHkNk",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIzZWZhZjYzOC1hMDJlLTQ2YTMtOTVhNS0wM2ZkMTYzMWQxMTEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjE4MWNkZDFiNjI4ODRlYjg5ODMyZDdmZWQyY2ZhYjliIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2NjQwMzUsImlhdCI6MTc4ODY0MjQzNX0.mWos6tiuYXbDTS3nujchU14blsyCYj0NHVk74fzMSc0"
 };
 
 // --- JWT HELPERS ---
@@ -240,6 +240,15 @@ async function validateSteamToken(bearerToken) {
     };
 }
 
+// --- SAFETY: reset stuck refresh lock after 30s ---
+setInterval(() => {
+    if (isRefreshing) {
+        console.log('[TMC] Safety: refreshing lock was stuck, force-releasing');
+        isRefreshing = false;
+        processQueue(new Error('Refresh lock timeout'), null);
+    }
+}, 30000);
+
 // --- REFRESH TOKEN ---
 async function refreshToken(refreshTk) {
     try {
@@ -269,6 +278,12 @@ async function refreshToken(refreshTk) {
         isRefreshing = true;
         console.log('[TMC] Refresh lock acquired');
 
+        const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+
+        // Try each URL with a retry per URL
+        const MAX_RETRIES_PER_URL = 2;
+        const allErrors = [];
+
         const urlsToTry = [...API_URLS];
         if (ACTIVE_API_URL && urlsToTry.includes(ACTIVE_API_URL)) {
             urlsToTry.splice(urlsToTry.indexOf(ACTIVE_API_URL), 1);
@@ -276,121 +291,187 @@ async function refreshToken(refreshTk) {
         }
 
         for (const url of urlsToTry) {
-            try {
-                const refreshUrl = `${url}/v2/account/session/refresh`;
-                console.log(`[TMC] Trying refresh at: ${refreshUrl}`);
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000);
-                const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+            for (let attempt = 1; attempt <= MAX_RETRIES_PER_URL; attempt++) {
+                try {
+                    const refreshUrl = `${url}/v2/account/session/refresh`;
+                    console.log(`[TMC] Trying refresh at: ${refreshUrl} (attempt ${attempt}/${MAX_RETRIES_PER_URL})`);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-                const response = await fetch(refreshUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
-                        'Authorization': serverKeyAuth
-                    },
-                    body: JSON.stringify({ token: refreshTk }),
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
+                    const response = await fetch(refreshUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
+                            'Authorization': serverKeyAuth
+                        },
+                        body: JSON.stringify({ token: refreshTk }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
 
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    console.log(`[TMC] ${url} - Not JSON response`);
-                    continue;
-                }
-
-                const data = await response.json();
-                console.log(`[TMC] Response:`, JSON.stringify(data).substring(0, 300));
-
-                let newBearer = null;
-                let newRefresh = null;
-
-                if (data.token) {
-                    newBearer = data.token;
-                    newRefresh = data.refresh_token || refreshTk;
-                } else if (data.access_token) {
-                    newBearer = data.access_token;
-                    newRefresh = data.refresh_token || refreshTk;
-                } else if (data.bearer) {
-                    newBearer = data.bearer;
-                    newRefresh = data.refresh_token || refreshTk;
-                }
-
-                if (response.status === 200 && newBearer) {
-                    const newExpiry = getTokenExpiryMs(newBearer);
-                    const newRefreshExpiry = getTokenExpiryMs(newRefresh);
-
-                    // Check if new access token is actually better than what we have
-                    const currentBearerExpiry = getTokenExpiryMs(DEFAULT_TOKEN.bearer);
-                    if (newExpiry <= Date.now()) {
-                        console.log(`[TMC] ${url} - Refreshed token already expired, skipping`);
-                        continue;
+                    // Try to read response body regardless of status
+                    let data = null;
+                    let rawBody = '';
+                    try {
+                        rawBody = await response.text();
+                        data = JSON.parse(rawBody);
+                    } catch (parseErr) {
+                        // Non-JSON response (HTML error page from cloudflare, etc.)
+                        const snippet = rawBody.substring(0, 150).replace(/\s+/g, ' ');
+                        console.log(`[TMC] ${url} (attempt ${attempt}) - Non-JSON response (status ${response.status}): ${snippet}`);
+                        allErrors.push(`${url}: non-JSON (status ${response.status})`);
+                        
+                        // If it's a server error (5xx), retry this URL
+                        if (response.status >= 500 && attempt < MAX_RETRIES_PER_URL) {
+                            console.log(`[TMC] Server error, retrying in 2s...`);
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                        break; // Move to next URL
                     }
 
-                    // Even if same token returned, accept it as proof session is alive
-                    // The key is the server accepted our refresh — session is valid
-                    console.log(`[TMC] Successfully refreshed token via ${url}!`);
-                    console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
-                    console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
-                    console.log(`[TMC] Access: ${humanExpiry(newExpiry)}, Refresh: ${humanExpiry(newRefreshExpiry)}`);
+                    console.log(`[TMC] ${url} - Status: ${response.status}, Body:`, JSON.stringify(data).substring(0, 300));
 
-                    DEFAULT_TOKEN.bearer = newBearer;
-                    DEFAULT_TOKEN.refresh_token = newRefresh;
-                    ACTIVE_API_URL = url;
-                    apiWorking = true;
-                    refreshRetryCount = 0;
+                    // Extract token from response — handle ALL known formats
+                    let newBearer = null;
+                    let newRefresh = null;
 
-                    // Update token lifetime tracking
-                    updateTokenLifetimeTracking(newBearer, newRefresh);
+                    if (data.token) {
+                        newBearer = data.token;
+                        newRefresh = data.refresh_token || refreshTk;
+                    } else if (data.access_token) {
+                        newBearer = data.access_token;
+                        newRefresh = data.refresh_token || refreshTk;
+                    } else if (data.bearer) {
+                        newBearer = data.bearer;
+                        newRefresh = data.refresh_token || refreshTk;
+                    } else if (data.session_token) {
+                        newBearer = data.session_token;
+                        newRefresh = data.refresh_token || refreshTk;
+                    }
 
-                    if (tokenStock.length > 0) {
-                        const oldToken = tokenStock[0];
-                        tokenStock[0] = {
-                            bearer: newBearer,
-                            refresh: newRefresh,
-                            addedAt: Date.now(),
+                    // Handle 401 — server says token is invalid
+                    if (response.status === 401) {
+                        const errMsg = data ? (data.message || data.error || JSON.stringify(data)) : 'no body';
+                        console.log(`[TMC] ${url} - 401 Unauthorized: ${errMsg}`);
+                        allErrors.push(`${url}: 401 - ${errMsg}`);
+                        
+                        // If we got a token back despite 401, still try to use it
+                        if (newBearer) {
+                            console.log(`[TMC] Got token despite 401, attempting to use it...`);
+                        } else {
+                            if (attempt < MAX_RETRIES_PER_URL) {
+                                await new Promise(r => setTimeout(r, 2000));
+                            }
+                            continue;
+                        }
+                    }
+
+                    // Handle 429 — rate limited
+                    if (response.status === 429) {
+                        console.log(`[TMC] ${url} - Rate limited! Waiting 5s before retry...`);
+                        allErrors.push(`${url}: 429 rate limited`);
+                        if (attempt < MAX_RETRIES_PER_URL) {
+                            await new Promise(r => setTimeout(r, 5000));
+                            continue;
+                        }
+                        break;
+                    }
+
+                    // Handle 5xx — server error, retry
+                    if (response.status >= 500) {
+                        console.log(`[TMC] ${url} - Server error ${response.status}`);
+                        allErrors.push(`${url}: ${response.status} server error`);
+                        if (attempt < MAX_RETRIES_PER_URL) {
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                        break;
+                    }
+
+                    // SUCCESS: 200 with a token
+                    if (response.status === 200 && newBearer) {
+                        const newExpiry = getTokenExpiryMs(newBearer);
+                        const newRefreshExpiry = getTokenExpiryMs(newRefresh);
+
+                        if (newExpiry <= Date.now()) {
+                            console.log(`[TMC] ${url} - Refreshed token already expired, skipping`);
+                            allErrors.push(`${url}: returned expired token`);
+                            continue;
+                        }
+
+                        console.log(`[TMC] Successfully refreshed token via ${url}!`);
+                        console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
+                        console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
+                        console.log(`[TMC] Access: ${humanExpiry(newExpiry)}, Refresh: ${humanExpiry(newRefreshExpiry)}`);
+
+                        DEFAULT_TOKEN.bearer = newBearer;
+                        DEFAULT_TOKEN.refresh_token = newRefresh;
+                        ACTIVE_API_URL = url;
+                        apiWorking = true;
+                        refreshRetryCount = 0;
+
+                        // Update token lifetime tracking
+                        updateTokenLifetimeTracking(newBearer, newRefresh);
+
+                        if (tokenStock.length > 0) {
+                            const oldToken = tokenStock[0];
+                            tokenStock[0] = {
+                                bearer: newBearer,
+                                refresh: newRefresh,
+                                addedAt: Date.now(),
+                                expiresAt: newExpiry,
+                                refreshExpiresAt: newRefreshExpiry,
+                                id: oldToken.id,
+                                userId: oldToken.userId,
+                                username: oldToken.username
+                            };
+                        } else {
+                            tokenStock.push({
+                                bearer: newBearer,
+                                refresh: newRefresh,
+                                addedAt: Date.now(),
+                                expiresAt: newExpiry,
+                                refreshExpiresAt: newRefreshExpiry,
+                                id: '',
+                                userId: 'system',
+                                username: 'System'
+                            });
+                        }
+
+                        const result = { 
+                            success: true, 
+                            bearer: newBearer, 
+                            refresh: newRefresh, 
                             expiresAt: newExpiry,
                             refreshExpiresAt: newRefreshExpiry,
-                            id: oldToken.id,
-                            userId: oldToken.userId,
-                            username: oldToken.username
+                            newToken: true
                         };
-                    } else {
-                        tokenStock.push({
-                            bearer: newBearer,
-                            refresh: newRefresh,
-                            addedAt: Date.now(),
-                            expiresAt: newExpiry,
-                            refreshExpiresAt: newRefreshExpiry,
-                            id: '',
-                            userId: 'system',
-                            username: 'System'
-                        });
+                        processQueue(null, result);
+                        isRefreshing = false;
+                        console.log('[TMC] Refresh lock released');
+                        return result;
                     }
 
-                    const result = { 
-                        success: true, 
-                        bearer: newBearer, 
-                        refresh: newRefresh, 
-                        expiresAt: newExpiry,
-                        refreshExpiresAt: newRefreshExpiry,
-                        newToken: true
-                    };
-                    processQueue(null, result);
-                    isRefreshing = false;
-                    console.log('[TMC] Refresh lock released');
-                    return result;
-                } else {
-                    console.log(`[TMC] ${url} - Status: ${response.status}`, data);
+                    // 200 but no token in response — log and move on
+                    console.log(`[TMC] ${url} - Got 200 but no token in response`);
+                    allErrors.push(`${url}: 200 but no token field`);
+
+                } catch (err) {
+                    const errMsg = err.name === 'AbortError' ? 'timeout (20s)' : err.message;
+                    console.log(`[TMC] ${url} (attempt ${attempt}) - ${errMsg}`);
+                    allErrors.push(`${url}: ${errMsg}`);
+                    
+                    // On network/timeout errors, retry with delay
+                    if (attempt < MAX_RETRIES_PER_URL) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
                 }
-            } catch (err) {
-                console.log(`[TMC] ${url} - ${err.message}`);
             }
         }
 
-        console.log('[TMC] All refresh URLs failed');
+        console.log('[TMC] All refresh URLs failed. Errors:', allErrors.join(' | '));
         refreshRetryCount++;
         
         if (tokenStock.length > 0) {
@@ -399,7 +480,7 @@ async function refreshToken(refreshTk) {
 
         processQueue(new Error('All refresh URLs failed'), null);
         isRefreshing = false;
-        return { success: false, error: 'All refresh URLs failed', retryCount: refreshRetryCount };
+        return { success: false, error: `All refresh URLs failed: ${allErrors[allErrors.length - 1]}`, retryCount: refreshRetryCount, allErrors };
     } catch (err) {
         console.error('[TMC] Refresh error:', err.message);
         processQueue(err, null);
