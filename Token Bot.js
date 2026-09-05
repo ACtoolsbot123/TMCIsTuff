@@ -23,7 +23,7 @@ const NO_COOLDOWN_ROLE_ID = "1527587043813625976";
 // --- DNS FIX FOR RENDER ---
 const dns = require('dns');
 dns.setServers(['8.8.8.8', '1.1.1.1']);
-console.log('[TMC] ✅ DNS set');
+console.log('[TMC] DNS set');
 
 // --- CREATE CLIENT ---
 const client = new Client({
@@ -53,8 +53,8 @@ let refreshInterval = null;
 
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIxN2ZmMmM5Yi1mYmE5LTQ3NjgtOGJiZC0yYjU4YzYxZTBjZTIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImJiOTNmYmUyNDBlODRmN2VhZTIyYzM4ZGQ4MGViODkzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NDgyNTIsImlhdCI6MTc4ODU0NDY1Mn0.JM15u2Z9CBdTCFZGPJCbEN4lsfij--in7iWaDFSTEsM",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIxN2ZmMmM5Yi1mYmE5LTQ3NjgtOGJiZC0yYjU4YzYxZTBjZTIiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImJiOTNmYmUyNDBlODRmN2VhZTIyYzM4ZGQ4MGViODkzIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1NjYyNTIsImlhdCI6MTc4ODU0NDY1Mn0.xyrQCXAjxzEZN5-rTNndDtwnupYchZZ7vwRDY1Z9KTE"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJiY2Q3OTcwZi0yOGVlLTQ0MGItOGZmMi04NzFkZDY0MDYzNGQiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImRlZjkzN2JlMDM2ZjQzMTRhMDc5MTcyNTc2MWIxMWExIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1ODQ1MjIsImlhdCI6MTc4ODU4MDkyMn0.he0WkQLOIYiskSiTlPQ5rqXXcENff4wU__WTyQoWULY",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJiY2Q3OTcwZi0yOGVlLTQ0MGItOGZmMi04NzFkZDY0MDYzNGQiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImRlZjkzN2JlMDM2ZjQzMTRhMDc5MTcyNTc2MWIxMWExIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2MDI1MjIsImlhdCI6MTc4ODU4MDkyMn0.rEZgUvaBE6usKd5W34iknA-FxGv79L1c6pGl0lO3usQ"
 };
 
 // --- JWT HELPERS ---
@@ -151,20 +151,20 @@ async function validateSteamToken(bearerToken) {
     };
 }
 
-// --- REFRESH TOKEN - FIXED ---
+// --- REFRESH TOKEN ---
 async function refreshToken(refreshTk) {
     try {
-        console.log('[TMC] 🔄 Attempting to refresh token...');
+        console.log('[TMC] Attempting to refresh token...');
         
         if (isRefreshing) {
-            console.log('[TMC] ⏳ Refresh in progress, queuing...');
+            console.log('[TMC] Refresh in progress, queuing...');
             return new Promise((resolve, reject) => {
                 failedQueue.push({ resolve, reject });
             });
         }
 
         isRefreshing = true;
-        console.log('[TMC] 🔒 Refresh lock acquired');
+        console.log('[TMC] Refresh lock acquired');
 
         const urlsToTry = [...API_URLS];
         if (ACTIVE_API_URL && urlsToTry.includes(ACTIVE_API_URL)) {
@@ -175,7 +175,7 @@ async function refreshToken(refreshTk) {
         for (const url of urlsToTry) {
             try {
                 const refreshUrl = `${url}/v2/account/session/refresh`;
-                console.log(`[TMC] 🔄 Trying refresh at: ${refreshUrl}`);
+                console.log(`[TMC] Trying refresh at: ${refreshUrl}`);
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 15000);
                 const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
@@ -187,27 +187,23 @@ async function refreshToken(refreshTk) {
                         'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
                         'Authorization': serverKeyAuth
                     },
-                    body: JSON.stringify({ 
-                        token: refreshTk,
-                        refresh_token: refreshTk 
-                    }),
+                    body: JSON.stringify({ token: refreshTk }),
                     signal: controller.signal
                 });
                 clearTimeout(timeoutId);
 
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
-                    console.log(`[TMC] ❌ ${url} - Not JSON response`);
+                    console.log(`[TMC] ${url} - Not JSON response`);
                     continue;
                 }
 
                 const data = await response.json();
-                console.log(`[TMC] 📦 Response:`, JSON.stringify(data).substring(0, 300));
+                console.log(`[TMC] Response:`, JSON.stringify(data).substring(0, 300));
 
                 let newBearer = null;
                 let newRefresh = null;
 
-                // Check multiple response formats
                 if (data.token) {
                     newBearer = data.token;
                     newRefresh = data.refresh_token || refreshTk;
@@ -219,33 +215,29 @@ async function refreshToken(refreshTk) {
                     newRefresh = data.refresh_token || refreshTk;
                 }
 
-                // Check if we got a NEW token (different from the old one)
                 if (response.status === 200 && newBearer) {
                     const newExpiry = getTokenExpiryMs(newBearer);
                     
-                    // Make sure we actually got a new token
                     if (newBearer === refreshTk) {
-                        console.log(`[TMC] ⚠️ ${url} - Refresh returned SAME token, skipping`);
+                        console.log(`[TMC] ${url} - Refresh returned SAME token, skipping`);
                         continue;
                     }
 
                     if (newExpiry <= Date.now()) {
-                        console.log(`[TMC] ⚠️ ${url} - Refreshed token already expired`);
+                        console.log(`[TMC] ${url} - Refreshed token already expired`);
                         continue;
                     }
 
-                    console.log(`[TMC] ✅ Successfully refreshed token via ${url}!`);
+                    console.log(`[TMC] Successfully refreshed token via ${url}!`);
                     console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
                     console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
-                    console.log(`[TMC] ⏳ ${humanExpiry(newExpiry)}`);
+                    console.log(`[TMC] ${humanExpiry(newExpiry)}`);
 
-                    // Update DEFAULT_TOKEN
                     DEFAULT_TOKEN.bearer = newBearer;
                     DEFAULT_TOKEN.refresh_token = newRefresh;
                     ACTIVE_API_URL = url;
                     apiWorking = true;
 
-                    // Update tokenStock
                     if (tokenStock.length > 0) {
                         const oldToken = tokenStock[0];
                         tokenStock[0] = {
@@ -278,17 +270,17 @@ async function refreshToken(refreshTk) {
                     };
                     processQueue(null, result);
                     isRefreshing = false;
-                    console.log('[TMC] 🔓 Refresh lock released');
+                    console.log('[TMC] Refresh lock released');
                     return result;
                 } else {
-                    console.log(`[TMC] ❌ ${url} - Status: ${response.status}`, data);
+                    console.log(`[TMC] ${url} - Status: ${response.status}`, data);
                 }
             } catch (err) {
-                console.log(`[TMC] ❌ ${url} - ${err.message}`);
+                console.log(`[TMC] ${url} - ${err.message}`);
             }
         }
 
-        console.log('[TMC] ❌ All refresh URLs failed');
+        console.log('[TMC] All refresh URLs failed');
         if (tokenStock.length > 0) {
             tokenStock[0].expiresAt = getTokenExpiryMs(tokenStock[0].bearer);
         }
@@ -300,6 +292,193 @@ async function refreshToken(refreshTk) {
         console.error('[TMC] Refresh error:', err.message);
         processQueue(err, null);
         isRefreshing = false;
+        return { success: false, error: err.message };
+    }
+}
+
+// --- REFRESH SPECIFIC TOKEN (by bearer + refresh input) ---
+async function refreshSpecificToken(bearerInput, refreshInput) {
+    try {
+        console.log('[TMC] Refreshing specific token...');
+
+        const refreshUrl = `${ACTIVE_API_URL}/v2/account/session/refresh`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+
+        const response = await fetch(refreshUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
+                'Authorization': serverKeyAuth
+            },
+            body: JSON.stringify({ token: refreshInput }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return { success: false, error: 'Server returned non-JSON response' };
+        }
+
+        const data = await response.json();
+
+        let newBearer = null;
+        let newRefresh = null;
+
+        if (data.token) {
+            newBearer = data.token;
+            newRefresh = data.refresh_token || refreshInput;
+        } else if (data.access_token) {
+            newBearer = data.access_token;
+            newRefresh = data.refresh_token || refreshInput;
+        } else if (data.bearer) {
+            newBearer = data.bearer;
+            newRefresh = data.refresh_token || refreshInput;
+        }
+
+        if (response.status === 200 && newBearer) {
+            const newExpiry = getTokenExpiryMs(newBearer);
+
+            if (newBearer === refreshInput) {
+                return { success: false, error: 'Server returned the same token. Token may not be refreshable yet.' };
+            }
+
+            if (newExpiry <= Date.now()) {
+                return { success: false, error: 'Refreshed token is already expired.' };
+            }
+
+            // Update stock - replace or add
+            if (tokenStock.length > 0) {
+                tokenStock[0] = {
+                    bearer: newBearer,
+                    refresh: newRefresh,
+                    addedAt: Date.now(),
+                    expiresAt: newExpiry,
+                    id: tokenStock[0].id,
+                    userId: tokenStock[0].userId,
+                    username: tokenStock[0].username
+                };
+            } else {
+                tokenStock.push({
+                    bearer: newBearer,
+                    refresh: newRefresh,
+                    addedAt: Date.now(),
+                    expiresAt: newExpiry,
+                    id: '',
+                    userId: 'system',
+                    username: 'System'
+                });
+            }
+
+            DEFAULT_TOKEN.bearer = newBearer;
+            DEFAULT_TOKEN.refresh_token = newRefresh;
+
+            console.log(`[TMC] Specific token refreshed! ${humanExpiry(newExpiry)}`);
+            return {
+                success: true,
+                bearer: newBearer,
+                refresh: newRefresh,
+                expiresAt: newExpiry
+            };
+        } else {
+            const errMsg = data.message || data.error || JSON.stringify(data);
+            return { success: false, error: `Status ${response.status}: ${errMsg}` };
+        }
+    } catch (err) {
+        console.error('[TMC] Specific refresh error:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
+// --- GENERATE TOKEN FROM DEVICE AUTH ---
+async function generateTokenFromDevice(deviceToken, deviceID) {
+    try {
+        console.log('[TMC] Generating token from device auth...');
+
+        const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/device`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+
+        const body = {
+            token: deviceToken,
+            vars: {
+                clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
+                deviceID: deviceID
+            }
+        };
+
+        const response = await fetch(`${authUrl}?create=true&sync=false`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'UnityPlayer/6000.3.12f1 (UnityWebRequest/1.0, libcurl/8.10.1-DEV)',
+                'Connection': 'keep-alive',
+                'Accept': '*/*',
+                'Accept-Encoding': 'deflate, gzip',
+                'Authorization': serverKeyAuth
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return { success: false, error: 'Server returned non-JSON response' };
+        }
+
+        const data = await response.json();
+        console.log(`[TMC] Device auth response:`, JSON.stringify(data).substring(0, 300));
+
+        let newBearer = null;
+        let newRefresh = null;
+
+        if (data.token) {
+            newBearer = data.token;
+            newRefresh = data.refresh_token || null;
+        } else if (data.access_token) {
+            newBearer = data.access_token;
+            newRefresh = data.refresh_token || null;
+        } else if (data.bearer) {
+            newBearer = data.bearer;
+            newRefresh = data.refresh_token || null;
+        }
+
+        if (response.status === 200 && newBearer) {
+            const newExpiry = getTokenExpiryMs(newBearer);
+
+            // Add to stock
+            tokenStock.push({
+                bearer: newBearer,
+                refresh: newRefresh,
+                addedAt: Date.now(),
+                expiresAt: newExpiry,
+                id: '',
+                userId: 'device_auth',
+                username: 'DeviceAuth'
+            });
+
+            // Update default
+            DEFAULT_TOKEN.bearer = newBearer;
+            if (newRefresh) DEFAULT_TOKEN.refresh_token = newRefresh;
+
+            console.log(`[TMC] Device auth token generated! ${humanExpiry(newExpiry)}`);
+            return {
+                success: true,
+                bearer: newBearer,
+                refresh: newRefresh,
+                expiresAt: newExpiry
+            };
+        } else {
+            const errMsg = data.message || data.error || JSON.stringify(data);
+            return { success: false, error: `Status ${response.status}: ${errMsg}` };
+        }
+    } catch (err) {
+        console.error('[TMC] Device auth error:', err.message);
         return { success: false, error: err.message };
     }
 }
@@ -320,7 +499,7 @@ async function refreshTokenInStock() {
     try {
         const refreshResult = await refreshToken(tokenObj.refresh);
         if (refreshResult.success) {
-            console.log('[TMC] ✅ Token refreshed');
+            console.log('[TMC] Token refreshed');
         }
     } catch (err) {}
 }
@@ -339,7 +518,7 @@ function scheduleNextRefresh() {
 }
 
 function startAutoRefresh() {
-    console.log('[TMC] 🔄 Auto-refresh every 1 minute');
+    console.log('[TMC] Auto-refresh every 1 minute');
     isRefreshing = false;
     failedQueue = [];
     setTimeout(async () => {
@@ -377,7 +556,7 @@ async function refreshAllTokens() {
     return { successCount, failCount };
 }
 
-// --- GENERATE TOKEN ---
+// --- GENERATE TOKEN (give to user) ---
 async function processTokenGeneration(interaction) {
     const userId = interaction.user.id;
     const member = interaction.member;
@@ -395,7 +574,7 @@ async function processTokenGeneration(interaction) {
                 const minutes = Math.floor(remaining / 60000);
                 const seconds = Math.floor((remaining % 60000) / 1000);
                 return interaction.editReply({
-                    content: `⏳ Please wait ${minutes}m ${seconds}s`
+                    content: `Please wait ${minutes}m ${seconds}s`
                 });
             }
         }
@@ -404,7 +583,7 @@ async function processTokenGeneration(interaction) {
     if (activeGenerations.has(userId)) {
         const startTime = activeGenerations.get(userId);
         if (Date.now() - startTime < 60000) {
-            return interaction.editReply({ content: '⏳ Please wait...' });
+            return interaction.editReply({ content: 'Please wait...' });
         } else {
             activeGenerations.delete(userId);
         }
@@ -413,7 +592,7 @@ async function processTokenGeneration(interaction) {
     activeGenerations.set(userId, Date.now());
     
     try {
-        await interaction.editReply({ content: '⏳ Generating...' });
+        await interaction.editReply({ content: 'Generating...' });
         
         if (tokenStock.length === 0) {
             tokenStock.push({
@@ -459,9 +638,9 @@ async function processTokenGeneration(interaction) {
         
         const embed = new EmbedBuilder()
             .setDescription(
-                `✅ Token generated!\n\n` +
-                `📁 token.json attached\n\n` +
-                `⏳ Status: **${expiryText}**`
+                `Token generated!\n\n` +
+                `token.json attached\n\n` +
+                `Status: **${expiryText}**`
             )
             .setColor(tokenExpired ? 0xED4245 : 0x2ECC71)
             .setFooter({ text: `TMC Gen` });
@@ -469,14 +648,14 @@ async function processTokenGeneration(interaction) {
         try {
             await interaction.user.send({ embeds: [embed], files: [attachment] });
             activeGenerations.delete(userId);
-            return interaction.editReply({ content: `✅ Token sent!\n⏳ ${expiryText}` });
+            return interaction.editReply({ content: `Token sent!\n${expiryText}` });
         } catch (err) {
             activeGenerations.delete(userId);
             const fallbackEmbed = new EmbedBuilder()
                 .setDescription(
-                    `⚠️ Could not send DM!\n\n` +
-                    `📁 token.json attached\n\n` +
-                    `⏳ Status: **${expiryText}**`
+                    `Could not send DM!\n\n` +
+                    `token.json attached\n\n` +
+                    `Status: **${expiryText}**`
                 )
                 .setColor(0xFEE75C)
                 .setFooter({ text: `TMC Gen` });
@@ -484,78 +663,212 @@ async function processTokenGeneration(interaction) {
             return interaction.editReply({
                 embeds: [fallbackEmbed],
                 files: [attachment],
-                content: '📩 Token sent here (DMs closed)'
+                content: 'Token sent here (DMs closed)'
             });
         }
     } catch (err) {
         console.error('[TMC] Error:', err);
         activeGenerations.delete(userId);
-        return interaction.editReply({ content: '❌ Error. Try again.' });
+        return interaction.editReply({ content: 'Error. Try again.' });
     }
 }
 
-// --- REFRESH BUTTON HANDLER ---
-async function processRefreshToken(interaction) {
+// --- REFRESH BUTTON HANDLER (opens modal) ---
+async function handleRefreshButton(interaction) {
+    const modal = new ModalBuilder()
+        .setCustomId('refresh_modal')
+        .setTitle('Refresh Token');
+
+    const bearerInput = new TextInputBuilder()
+        .setCustomId('refresh_bearer_input')
+        .setLabel("PASTE YOUR BEARER TOKEN")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+        .setRequired(true)
+        .setMinLength(10)
+        .setMaxLength(2000);
+
+    const refreshInput = new TextInputBuilder()
+        .setCustomId('refresh_refresh_input')
+        .setLabel("PASTE YOUR REFRESH TOKEN")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+        .setRequired(true)
+        .setMinLength(10)
+        .setMaxLength(2000);
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(bearerInput),
+        new ActionRowBuilder().addComponents(refreshInput)
+    );
+    return await interaction.showModal(modal);
+}
+
+// --- REFRESH MODAL SUBMIT HANDLER ---
+async function processRefreshModal(interaction) {
     await interaction.deferReply({ flags: 64 });
-    
+
     try {
-        if (tokenStock.length === 0) {
-            return interaction.editReply({ content: '❌ No tokens in stock to refresh.' });
+        const bearerInput = interaction.fields.getTextInputValue('refresh_bearer_input').trim();
+        const refreshInput = interaction.fields.getTextInputValue('refresh_refresh_input').trim();
+
+        if (!bearerInput || !refreshInput) {
+            return interaction.editReply({ content: 'Both bearer and refresh token are required.' });
         }
-        
-        await interaction.editReply({ content: '🔄 Attempting to refresh token...' });
-        
-        const tokenObj = tokenStock[0];
-        if (!tokenObj.refresh) {
-            return interaction.editReply({ content: '❌ No refresh token found in stock!' });
+
+        // Validate the bearer token format
+        const validation = await validateSteamToken(bearerInput);
+        if (!validation.valid) {
+            return interaction.editReply({ content: `Invalid bearer token: ${validation.message}` });
         }
-        
-        // Log the old token for comparison
-        console.log('[TMC] Old Bearer:', tokenObj.bearer.substring(0, 50) + '...');
-        
-        const refreshResult = await refreshToken(tokenObj.refresh);
-        
-        if (refreshResult.success && refreshResult.newToken) {
-            const expiryText = humanExpiry(tokenStock[0].expiresAt);
-            
-            // Verify the token actually changed
-            const oldBearer = tokenObj.bearer;
-            const newBearer = tokenStock[0].bearer;
-            
+
+        await interaction.editReply({ content: 'Refreshing with provided tokens...' });
+
+        const result = await refreshSpecificToken(bearerInput, refreshInput);
+
+        if (result.success) {
+            const expiryText = humanExpiry(result.expiresAt);
+
             const embed = new EmbedBuilder()
                 .setDescription(
-                    `✅ Token refreshed successfully!\n\n` +
-                    `📋 **New Bearer:** \`${newBearer.substring(0, 50)}...\`\n` +
-                    `📋 **New Refresh:** \`${tokenStock[0].refresh.substring(0, 50)}...\`\n\n` +
-                    `⏳ Status: **${expiryText}**\n` +
-                    `🔄 Token changed: **${oldBearer !== newBearer ? '✅ YES' : '❌ NO'}**`
+                    `Token refreshed successfully!\n\n` +
+                    `**New Bearer:** \`${result.bearer.substring(0, 60)}...\`\n` +
+                    `**New Refresh:** \`${result.refresh.substring(0, 60)}...\`\n\n` +
+                    `Status: **${expiryText}**\n` +
+                    `Stock: **${tokenStock.length}** token(s)`
                 )
                 .setColor(0x2ECC71)
                 .setFooter({ text: `TMC Gen` });
-            
-            return interaction.editReply({ embeds: [embed] });
+
+            // Also send new tokens as JSON file
+            const tokenData = {
+                token: {
+                    bearer: result.bearer,
+                    refresh_token: result.refresh
+                }
+            };
+            const jsonBuffer = Buffer.from(JSON.stringify(tokenData, null, 2), 'utf-8');
+            const attachment = new AttachmentBuilder(jsonBuffer, { name: 'refreshed_token.json' });
+
+            return interaction.editReply({ embeds: [embed], files: [attachment] });
         } else {
-            return interaction.editReply({ 
-                content: `❌ Failed to refresh token.\n\nError: ${refreshResult.error || 'Unknown error'}\n\n💡 Try using /stock to add a fresh token from the game.` 
+            return interaction.editReply({
+                content: `Failed to refresh token.\n\nError: ${result.error}\n\nMake sure your bearer and refresh tokens are valid and from the same session.`
             });
         }
     } catch (err) {
-        console.error('[TMC] Refresh Error:', err);
-        return interaction.editReply({ content: '❌ Error refreshing token. Try again.' });
+        console.error('[TMC] Refresh modal error:', err);
+        return interaction.editReply({ content: 'Error refreshing token. Try again.' });
+    }
+}
+
+// --- DEVICE AUTH GENERATOR (opens modal) ---
+async function handleDeviceGenButton(interaction) {
+    const modal = new ModalBuilder()
+        .setCustomId('device_gen_modal')
+        .setTitle('Generate Token (Device Auth)');
+
+    const deviceTokenInput = new TextInputBuilder()
+        .setCustomId('device_token_input')
+        .setLabel("DEVICE TOKEN")
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder("Paste the full device authentication token...")
+        .setRequired(true)
+        .setMinLength(10)
+        .setMaxLength(2000);
+
+    const deviceIDInput = new TextInputBuilder()
+        .setCustomId('device_id_input')
+        .setLabel("DEVICE ID")
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder("e.g. 1835761c2a8b6c629b9ff9edff289d7f3ea128")
+        .setRequired(true)
+        .setMinLength(5)
+        .setMaxLength(200);
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(deviceTokenInput),
+        new ActionRowBuilder().addComponents(deviceIDInput)
+    );
+    return await interaction.showModal(modal);
+}
+
+// --- DEVICE AUTH MODAL SUBMIT ---
+async function processDeviceGenModal(interaction) {
+    await interaction.deferReply({ flags: 64 });
+
+    try {
+        const deviceToken = interaction.fields.getTextInputValue('device_token_input').trim();
+        const deviceID = interaction.fields.getTextInputValue('device_id_input').trim();
+
+        if (!deviceToken || !deviceID) {
+            return interaction.editReply({ content: 'Both device token and device ID are required.' });
+        }
+
+        await interaction.editReply({ content: 'Generating token via device auth...' });
+
+        const result = await generateTokenFromDevice(deviceToken, deviceID);
+
+        if (result.success) {
+            const expiryText = humanExpiry(result.expiresAt);
+
+            const embed = new EmbedBuilder()
+                .setDescription(
+                    `Token generated via device auth!\n\n` +
+                    `**Bearer:** \`${result.bearer.substring(0, 60)}...\`\n` +
+                    (result.refresh ? `**Refresh:** \`${result.refresh.substring(0, 60)}...\`\n\n` : '\n') +
+                    `Status: **${expiryText}**\n` +
+                    `Stock: **${tokenStock.length}** token(s)`
+                )
+                .setColor(0x2ECC71)
+                .setFooter({ text: `TMC Gen` });
+
+            const tokenData = {
+                token: {
+                    bearer: result.bearer,
+                    refresh_token: result.refresh
+                }
+            };
+            const jsonBuffer = Buffer.from(JSON.stringify(tokenData, null, 2), 'utf-8');
+            const attachment = new AttachmentBuilder(jsonBuffer, { name: 'generated_token.json' });
+
+            try {
+                await interaction.user.send({ embeds: [embed], files: [attachment] });
+                return interaction.editReply({ content: `Token generated and sent via DM!\n${expiryText}` });
+            } catch (dmErr) {
+                return interaction.editReply({ embeds: [embed], files: [attachment], content: 'Token generated (DMs closed, sent here)' });
+            }
+        } else {
+            return interaction.editReply({ content: `Failed to generate token.\n\nError: ${result.error}` });
+        }
+    } catch (err) {
+        console.error('[TMC] Device gen error:', err);
+        return interaction.editReply({ content: 'Error generating token. Try again.' });
     }
 }
 
 // --- SLASH COMMANDS ---
 const commandsData = [
-    new SlashCommandBuilder().setName('stock').setDescription('Add token stock').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder().setName('dashboard').setDescription('Token Generator panel'),
-    new SlashCommandBuilder().setName('refreshall').setDescription('Refresh all tokens in stock pool').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('stock')
+        .setDescription('Add token stock (bearer + refresh)')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('dashboard')
+        .setDescription('Token Generator panel'),
+    new SlashCommandBuilder()
+        .setName('refreshall')
+        .setDescription('Refresh all tokens in stock pool')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('stockcheck')
+        .setDescription('Check current token stock status'),
 ].map(cmd => cmd.toJSON());
 
 // --- READY ---
 client.once('ready', async () => {
-    console.log(`[TMC] 🚀 ONLINE: ${client.user.tag}`);
-    console.log(`[TMC] 👑 Connected to ${client.guilds.cache.size} server(s)`);
+    console.log(`[TMC] ONLINE: ${client.user.tag}`);
+    console.log(`[TMC] Connected to ${client.guilds.cache.size} server(s)`);
 
     tokenStock = [{
         bearer: DEFAULT_TOKEN.bearer,
@@ -568,12 +881,12 @@ client.once('ready', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commandsData });
-        console.log('[TMC] ✅ Commands registered');
+        console.log('[TMC] Commands registered');
     } catch (error) {
         console.error('[TMC] Failed to register commands:', error);
     }
     startAutoRefresh();
-    console.log('[TMC] ✅ Bot ready!');
+    console.log('[TMC] Bot ready!');
 });
 
 // --- ERROR HANDLING ---
@@ -588,7 +901,7 @@ client.on('interactionCreate', async interaction => {
 
             if (commandName === 'dashboard') {
                 const embed = new EmbedBuilder()
-                    .setDescription(`**TMC Gen**\n\nClick below to generate your token.`)
+                    .setDescription(`**TMC Gen**\n\nGenerate, refresh, and manage your tokens.`)
                     .setColor(0x5865F2)
                     .setFooter({ text: `TMC Gen` });
 
@@ -603,12 +916,20 @@ client.on('interactionCreate', async interaction => {
                 const row2 = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
                         .setCustomId('refresh_token_btn')
-                        .setLabel('🔄 Refresh Token')
+                        .setLabel('Refresh Token')
                         .setStyle(ButtonStyle.Primary)
                         .setEmoji('🔄')
                 );
 
-                return interaction.reply({ embeds: [embed], components: [row1, row2] });
+                const row3 = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('device_gen_btn')
+                        .setLabel('Device Auth Gen')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setEmoji('⚙️')
+                );
+
+                return interaction.reply({ embeds: [embed], components: [row1, row2, row3] });
             }
 
             if (commandName === 'stock') {
@@ -644,15 +965,45 @@ client.on('interactionCreate', async interaction => {
             if (commandName === 'refreshall') {
                 await interaction.deferReply({ flags: 64 });
                 if (tokenStock.length === 0) {
-                    return interaction.editReply({ content: '❌ No tokens in stock to refresh.' });
+                    return interaction.editReply({ content: 'No tokens in stock to refresh.' });
                 }
                 
-                await interaction.editReply({ content: `🔄 Refreshing all ${tokenStock.length} tokens...` });
+                await interaction.editReply({ content: `Refreshing all ${tokenStock.length} tokens...` });
                 const { successCount, failCount } = await refreshAllTokens();
                 
                 return interaction.editReply({ 
-                    content: `✅ Refresh complete!\n- Successful: **${successCount}**\n- Failed: **${failCount}**\n- Total Stock: **${tokenStock.length}**` 
+                    content: `Refresh complete!\n- Successful: **${successCount}**\n- Failed: **${failCount}**\n- Total Stock: **${tokenStock.length}**` 
                 });
+            }
+
+            if (commandName === 'stockcheck') {
+                await interaction.deferReply({ flags: 64 });
+                
+                if (tokenStock.length === 0) {
+                    return interaction.editReply({ content: 'Stock is empty.' });
+                }
+
+                let description = '';
+                for (let i = 0; i < Math.min(tokenStock.length, 10); i++) {
+                    const t = tokenStock[i];
+                    const expiry = humanExpiry(t.expiresAt);
+                    const isExpired = Date.now() >= t.expiresAt;
+                    description += `**#${i + 1}** ${isExpired ? 'EXPIRED' : expiry}`;
+                    if (t.username) description += ` | ${t.username}`;
+                    description += '\n';
+                }
+
+                if (tokenStock.length > 10) {
+                    description += `\n...and ${tokenStock.length - 10} more`;
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle('Token Stock')
+                    .setDescription(description)
+                    .setColor(0x5865F2)
+                    .setFooter({ text: `Total: ${tokenStock.length} | Auto-refresh: ON` });
+
+                return interaction.editReply({ embeds: [embed] });
             }
         }
 
@@ -663,36 +1014,51 @@ client.on('interactionCreate', async interaction => {
             }
             
             if (interaction.customId === 'refresh_token_btn') {
-                return await processRefreshToken(interaction);
+                return await handleRefreshButton(interaction);
+            }
+
+            if (interaction.customId === 'device_gen_btn') {
+                return await handleDeviceGenButton(interaction);
             }
         }
 
-        if (interaction.isModalSubmit() && interaction.customId === 'stock_modal') {
-            await interaction.deferReply({ flags: 64 });
-            const bearer = interaction.fields.getTextInputValue('stock_bearer_input').trim();
-            const refresh = interaction.fields.getTextInputValue('stock_refresh_input').trim();
-            
-            if (!bearer || !refresh) {
-                return interaction.editReply({ content: '❌ Error: Both tokens required.' });
+        // --- MODAL SUBMISSIONS ---
+        if (interaction.isModalSubmit()) {
+            if (interaction.customId === 'stock_modal') {
+                await interaction.deferReply({ flags: 64 });
+                const bearer = interaction.fields.getTextInputValue('stock_bearer_input').trim();
+                const refresh = interaction.fields.getTextInputValue('stock_refresh_input').trim();
+                
+                if (!bearer || !refresh) {
+                    return interaction.editReply({ content: 'Both tokens required.' });
+                }
+
+                const validation = await validateSteamToken(bearer);
+                if (!validation.valid) {
+                    return interaction.editReply({ content: `Invalid token: ${validation.message}` });
+                }
+                
+                tokenStock.push({
+                    bearer, refresh,
+                    addedAt: Date.now(),
+                    expiresAt: getTokenExpiryMs(bearer)
+                });
+
+                return interaction.editReply({ content: `Token added! Total: \`${tokenStock.length}\`` });
             }
 
-            const validation = await validateSteamToken(bearer);
-            if (!validation.valid) {
-                return interaction.editReply({ content: `❌ Invalid token: ${validation.message}` });
+            if (interaction.customId === 'refresh_modal') {
+                return await processRefreshModal(interaction);
             }
-            
-            tokenStock.push({
-                bearer, refresh,
-                addedAt: Date.now(),
-                expiresAt: getTokenExpiryMs(bearer)
-            });
 
-            return interaction.editReply({ content: `📦 Token added! Total: \`${tokenStock.length}\`` });
+            if (interaction.customId === 'device_gen_modal') {
+                return await processDeviceGenModal(interaction);
+            }
         }
     } catch (err) {
         console.error(`[TMC] Error:`, err);
         if (!interaction.replied && !interaction.deferred) {
-            interaction.reply({ content: "❌ Error. Try again.", flags: 64 }).catch(() => {});
+            interaction.reply({ content: "Error. Try again.", flags: 64 }).catch(() => {});
         }
     }
 });
@@ -704,6 +1070,7 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ 
             status: 'ok', 
             bot: client.user ? 'online' : 'offline', 
+            stock: tokenStock.length,
             timestamp: Date.now() 
         }));
         return;
@@ -717,16 +1084,16 @@ server.listen(PORT, '0.0.0.0', () => console.log(`[TMC] HTTP server on port ${PO
 server.on('error', err => console.error('[TMC] Server error:', err));
 
 // --- LOGIN ---
-console.log('[TMC] 🔑 Logging in...');
+console.log('[TMC] Logging in...');
 
 if (!process.env.DISCORD_TOKEN) {
-    console.error('[TMC] ❌ DISCORD_TOKEN not set!');
+    console.error('[TMC] DISCORD_TOKEN not set!');
 } else {
-    console.log(`[TMC] ✅ Token set (length: ${process.env.DISCORD_TOKEN.length})`);
+    console.log(`[TMC] Token set (length: ${process.env.DISCORD_TOKEN.length})`);
     client.login(process.env.DISCORD_TOKEN).catch(err => {
-        console.error('[TMC] ❌ Login failed:', err.message);
+        console.error('[TMC] Login failed:', err.message);
         setTimeout(() => {
-            console.log('[TMC] 🔄 Retrying login...');
+            console.log('[TMC] Retrying login...');
             client.login(process.env.DISCORD_TOKEN).catch(() => {});
         }, 5000);
     });
@@ -743,19 +1110,19 @@ process.on('uncaughtException', (err) => {
 });
 
 setInterval(() => {
-    console.log('[TMC] ⏳ Bot is alive...');
+    console.log('[TMC] Bot is alive...');
 }, 45000);
 
 client.on('disconnect', () => {
-    console.log('[TMC] ❌ Disconnected! Reconnecting in 3 seconds...');
+    console.log('[TMC] Disconnected! Reconnecting in 3 seconds...');
     setTimeout(() => {
         client.login(process.env.DISCORD_TOKEN).catch(() => {});
     }, 3000);
 });
 
-client.on('resume', () => console.log('[TMC] ✅ Connection resumed'));
-client.on('reconnecting', () => console.log('[TMC] 🔄 Reconnecting...'));
-client.on('rateLimit', (info) => console.log(`[TMC] ⚠️ Rate limit hit: ${info.timeout}ms`));
+client.on('resume', () => console.log('[TMC] Connection resumed'));
+client.on('reconnecting', () => console.log('[TMC] Reconnecting...'));
+client.on('rateLimit', (info) => console.log(`[TMC] Rate limit hit: ${info.timeout}ms`));
 
 // External URL self-ping loop
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
@@ -763,5 +1130,5 @@ if (RENDER_EXTERNAL_URL) {
     setInterval(() => {
         fetch(`${RENDER_EXTERNAL_URL}/health`).catch(() => {});
     }, 14 * 60 * 1000);
-    console.log(`[TMC] 🌐 Keep-alive active targeting: ${RENDER_EXTERNAL_URL}`);
+    console.log(`[TMC] Keep-alive active targeting: ${RENDER_EXTERNAL_URL}`);
 }
