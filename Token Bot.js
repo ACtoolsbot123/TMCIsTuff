@@ -972,6 +972,14 @@ client.on('disconnect', () => console.log('[TMC] Disconnected, reconnecting...')
 // --- INTERACTIONS ---
 client.on('interactionCreate', async interaction => {
     try {
+        // Block ALL interactions in DMs
+        if (!interaction.guild) {
+            if (!interaction.replied && !interaction.deferred) {
+                return interaction.reply({ content: 'Commands only work in the server.', flags: 64 }).catch(() => {});
+            }
+            return;
+        }
+
         if (interaction.isChatInputCommand()) {
             const { commandName } = interaction;
 
