@@ -19,6 +19,7 @@ const http = require('http');
 
 // --- CONFIGURATION ---
 const NO_COOLDOWN_ROLE_ID = "1527587043813625976";
+const ALLOWED_GUILD_ID = "1448381577489813607";
 
 // --- DNS FIX FOR RENDER ---
 const dns = require('dns');
@@ -886,7 +887,32 @@ client.once('ready', async () => {
         console.error('[TMC] Failed to register commands:', error);
     }
     startAutoRefresh();
+
+    // Guild lock sweep - leave any unauthorized servers on startup
+    client.guilds.cache.forEach(async (guild) => {
+        if (guild.id !== ALLOWED_GUILD_ID) {
+            console.log(`[TMC] Leaving unauthorized server on startup: ${guild.name} (${guild.id})`);
+            try {
+                await guild.leave();
+            } catch (err) {
+                console.error(`[TMC] Failed to leave ${guild.id}:`, err);
+            }
+        }
+    });
+
     console.log('[TMC] Bot ready!');
+});
+
+// --- GUILD LOCK (only allow YOUR server) ---
+client.on('guildCreate', async guild => {
+    if (guild.id !== ALLOWED_GUILD_ID) {
+        console.log(`[TMC] Unauthorized server detected: ${guild.name} (${guild.id}) — leaving.`);
+        try {
+            await guild.leave();
+        } catch (err) {
+            console.error('[TMC] Failed to leave unauthorized server:', err);
+        }
+    }
 });
 
 // --- ERROR HANDLING ---
