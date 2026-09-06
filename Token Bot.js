@@ -221,7 +221,7 @@ async function findWorkingApiUrl() {
             const timeoutId = setTimeout(() => controller.abort(), 5000);
             const response = await fetch(url, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json', 'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5' },
+                headers: { 'Content-Type': 'application/json', 'User-Agent': 'SteamVR 1.77.4.3069_ddcdd3a4' },
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -312,7 +312,7 @@ async function refreshToken(refreshTk) {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
+                            'User-Agent': 'SteamVR 1.77.4.3069_ddcdd3a4',
                             'Authorization': serverKeyAuth
                         },
                         body: JSON.stringify({ token: refreshTk }),
@@ -518,7 +518,7 @@ async function refreshSpecificToken(bearerInput, refreshInput) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'SteamVR 1.88.1.3421_a3df6ce5',
+                'User-Agent': 'SteamVR 1.77.4.3069_ddcdd3a4',
                 'Authorization': serverKeyAuth
             },
             body: JSON.stringify({ token: refreshInput }),
@@ -617,7 +617,7 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
     try {
         console.log('[TMC] Generating token from device auth...');
 
-        const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/steam`;
+        const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/device`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
@@ -625,7 +625,7 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
         const body = {
             token: deviceToken,
             vars: {
-                clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
+                clientUserAgent: "SteamVR 1.77.4.3069_ddcdd3a4",
                 deviceID: deviceID
             }
         };
@@ -724,7 +724,7 @@ async function freshDeviceAuth() {
         return { success: false, error: 'DEVICE_ID not set' };
     }
 
-    const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/steam`;
+    const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/device`;
     const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
 
     try {
@@ -819,10 +819,10 @@ async function autoReAuthFromDevice() {
             urlsToTry.unshift(ACTIVE_API_URL);
         }
         
-        // Token is a Steam auth session ticket (hex protobuf starting with 14000000)
-        // These only work with /authenticate/steam, NOT /authenticate/device
+        // Steam auth session tickets (hex protobuf starting with 14000000)
+        // Use /authenticate/device endpoint
         const authEndpoints = [
-            '/v2/account/authenticate/steam'
+            '/v2/account/authenticate/device'
         ];
 
         for (const url of urlsToTry) {
@@ -838,7 +838,7 @@ async function autoReAuthFromDevice() {
                     const body = {
                         token: DEVICE_TOKEN,
                         vars: {
-                            clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
+                            clientUserAgent: "SteamVR 1.77.4.3069_ddcdd3a4",
                             deviceID: DEVICE_ID
                         }
                     };
