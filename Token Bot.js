@@ -74,8 +74,8 @@ let tokenLifetime = {
 
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJmZWM5M2I3YS1kZDQwLTQ1MGYtOWY1MC0xMDNmZWYzNTFhNGEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjA4NTIxOWE3Y2Y5OTRjZmY5NzNkYjhkYWZiMTNlMWI4IiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2OTk3NzEsImlhdCI6MTc4ODY5NjE3MX0.GD2hE-qCVGZ6Dof91r8_imW1Ox1lBDpmy5-cLzyEyX4",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJmZWM5M2I3YS1kZDQwLTQ1MGYtOWY1MC0xMDNmZWYzNTFhNGEiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6IjA4NTIxOWE3Y2Y5OTRjZmY5NzNkYjhkYWZiMTNlMWI4IiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg3MTc3NzEsImlhdCI6MTc4ODY5NjE3MX0.V14Gpet9WrH5hyYLZhMh0ikDvAYZRE3Wpjfgr65mdbI"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJiY2Q3OTcwZi0yOGVlLTQ0MGItOGZmMi04NzFkZDY0MDYzNGQiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImRlZjkzN2JlMDM2ZjQzMTRhMDc5MTcyNTc2MWIxMWExIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg1ODQ1MjIsImlhdCI6MTc4ODU4MDkyMn0.he0WkQLOIYiskSiTlPQ5rqXXcENff4wU__WTyQoWULY",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJiY2Q3OTcwZi0yOGVlLTQ0MGItOGZmMi04NzFkZDY0MDYzNGQiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImRlZjkzN2JlMDM2ZjQzMTRhMDc5MTcyNTc2MWIxMWExIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg2MDI1MjIsImlhdCI6MTc4ODU4MDkyMn0.rEZgUvaBE6usKd5W34iknA-FxGv79L1c6pGl0lO3usQ"
 };
 
 // --- JWT HELPERS ---
@@ -711,6 +711,74 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
     }
 }
 
+// --- FRESH DEVICE AUTH (no side effects — for user gens) ---
+// does NOT update DEFAULT_TOKEN, tokenStock, or any global state
+// returns a brand new independent token pair
+async function freshDeviceAuth() {
+    const dt = DEVICE_TOKEN;
+    const did = DEVICE_ID;
+    if (!dt || dt.length < 50) {
+        return { success: false, error: 'DEVICE_TOKEN not set' };
+    }
+    if (!did || did.length < 5) {
+        return { success: false, error: 'DEVICE_ID not set' };
+    }
+
+    const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/steam`;
+    const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        const response = await fetch(`${authUrl}?create=true&sync=false`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'UnityPlayer/6000.3.12f1 (UnityWebRequest/1.0, libcurl/8.10.1-DEV)',
+                'Connection': 'keep-alive',
+                'Accept': '*/*',
+                'Accept-Encoding': 'deflate, gzip',
+                'Authorization': serverKeyAuth,
+                'x-unity-version': '6000.3.12f1'
+            },
+            body: JSON.stringify({
+                token: dt,
+                vars: {
+                    clientUserAgent: "SteamVR 1.77.4.3069_ddcdd3a4",
+                    deviceID: did
+                }
+            }),
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+
+        let newBearer = data.token || data.access_token || data.bearer || null;
+        let newRefresh = data.refresh_token || null;
+
+        if (response.status === 200 && newBearer) {
+            const newExpiry = getTokenExpiryMs(newBearer);
+            console.log(`[TMC] Fresh device auth OK — expires ${humanExpiry(newExpiry)}`);
+            return {
+                success: true,
+                bearer: newBearer,
+                refresh: newRefresh,
+                expiresAt: newExpiry
+            };
+        } else {
+            const errMsg = data ? (data.message || data.error || JSON.stringify(data)) : 'no body';
+            console.log(`[TMC] Fresh device auth failed (${response.status}): ${errMsg}`);
+            return { success: false, error: `Status ${response.status}: ${errMsg}` };
+        }
+    } catch (err) {
+        const errMsg = err.name === 'AbortError' ? 'timeout' : err.message;
+        console.log(`[TMC] Fresh device auth error: ${errMsg}`);
+        return { success: false, error: errMsg };
+    }
+}
+
 // --- AUTO RE-AUTH FROM DEVICE (when refresh token dies) ---
 async function autoReAuthFromDevice() {
     // Validate both credentials
@@ -1247,46 +1315,53 @@ async function processTokenGeneration(interaction) {
     activeGenerations.set(userId, Date.now());
     
     try {
-        await interaction.editReply({ content: 'Generating...' });
-        
-        if (tokenStock.length === 0) {
-            tokenStock.push({
-                bearer: DEFAULT_TOKEN.bearer,
-                refresh: DEFAULT_TOKEN.refresh_token,
-                addedAt: Date.now(),
-                expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer),
-                refreshExpiresAt: getTokenExpiryMs(DEFAULT_TOKEN.refresh_token)
-            });
+        await interaction.editReply({ content: 'Generating fresh token via device auth...' });
+
+        // FRESH device auth → gives the user their OWN independent token
+        // this token is NOT in the stock, so auto-refresh won't kill it
+        let userBearer = null;
+        let userRefresh = null;
+        let userExpiresAt = 0;
+
+        const freshResult = await freshDeviceAuth();
+        if (freshResult && freshResult.success) {
+            userBearer = freshResult.bearer;
+            userRefresh = freshResult.refresh;
+            userExpiresAt = freshResult.expiresAt;
+            console.log(`[TMC] Fresh token for user: ${humanExpiry(userExpiresAt)}`);
+        } else {
+            // device auth failed — fall back to stock token (may get invalidated by refresh)
+            console.log(`[TMC] Device auth failed for user gen: ${freshResult ? freshResult.error : 'unknown'}, falling back to stock`);
+            if (tokenStock.length === 0) {
+                tokenStock.push({
+                    bearer: DEFAULT_TOKEN.bearer,
+                    refresh: DEFAULT_TOKEN.refresh_token,
+                    addedAt: Date.now(),
+                    expiresAt: getTokenExpiryMs(DEFAULT_TOKEN.bearer),
+                    refreshExpiresAt: getTokenExpiryMs(DEFAULT_TOKEN.refresh_token)
+                });
+            }
+            let tokenObj = tokenStock[0];
+            const refreshResult = await refreshToken(tokenObj.refresh);
+            if (refreshResult.success && refreshResult.newToken) {
+                tokenObj = tokenStock[0];
+            }
+            userBearer = tokenObj.bearer;
+            userRefresh = tokenObj.refresh;
+            userExpiresAt = tokenObj.expiresAt;
         }
-        
-        let tokenObj = tokenStock[0];
-        const refreshResult = await refreshToken(tokenObj.refresh);
-        if (refreshResult.success && refreshResult.newToken) {
-            tokenObj = tokenStock[0];
-        }
-        
-        const validationResult = await validateSteamToken(tokenObj.bearer);
-        if (validationResult.expiresAt) tokenObj.expiresAt = validationResult.expiresAt;
-        
-        tokenObj.userId = interaction.user.id;
-        tokenObj.username = interaction.user.tag;
-        
-        tokenStock.shift();
-        tokenStock.push(tokenObj);
-        
-        saveTokenState();
-        
+
         if (!hasNoCooldown) {
             cooldowns.set(`public_${userId}`, Date.now() + 5 * 60 * 1000);
         }
-        
-        const expiryText = humanExpiry(tokenObj.expiresAt);
-        const tokenExpired = Date.now() >= tokenObj.expiresAt;
+
+        const expiryText = humanExpiry(userExpiresAt);
+        const tokenExpired = Date.now() >= userExpiresAt;
 
         const tokenData = {
             token: {
-                bearer: tokenObj.bearer,
-                refresh_token: tokenObj.refresh
+                bearer: userBearer,
+                refresh_token: userRefresh
             }
         };
         
@@ -1296,9 +1371,10 @@ async function processTokenGeneration(interaction) {
         
         const embed = new EmbedBuilder()
             .setDescription(
-                `Token generated!\n\n` +
+                `Fresh token generated!\n\n` +
                 `token.json attached\n\n` +
-                `Status: **${expiryText}**`
+                `Status: **${expiryText}**\n` +
+                `Source: **Device Auth** (independent, won't be refreshed by bot)`
             )
             .setColor(tokenExpired ? 0xED4245 : 0x2ECC71)
             .setFooter({ text: `TMC Gen` });
@@ -1311,9 +1387,10 @@ async function processTokenGeneration(interaction) {
             activeGenerations.delete(userId);
             const fallbackEmbed = new EmbedBuilder()
                 .setDescription(
-                    `Could not send DM!\n\n` +
+                    `Fresh token generated!\n\n` +
                     `token.json attached\n\n` +
-                    `Status: **${expiryText}**`
+                    `Status: **${expiryText}**\n` +
+                    `Source: **Device Auth**`
                 )
                 .setColor(0xFEE75C)
                 .setFooter({ text: `TMC Gen` });
