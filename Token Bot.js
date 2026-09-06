@@ -45,8 +45,10 @@ const API_URLS = [ NAKAMA_SERVER ];
 
 // --- DEVICE AUTH CONFIG (for auto re-auth when refresh token dies) ---
 // DEVICE_ID = your persistent hardware GUID (from yaml: a60f8dba...)
-// DEVICE_TOKEN = optional — if empty, bot will use DEVICE_ID as the token
-//                (Nakama device auth just needs a stable unique ID)
+// DEVICE_TOKEN = the LONG hex auth token from the game (NOT the device ID!)
+//                Looks like: 140000003124252097EDD94B5D1DCB1601001001AA342F6A...
+//                This is the "token" field from the /authenticate/device request body in Insomnia.
+//                If empty, re-auth will NOT work — the server requires this hex blob.
 const DEVICE_TOKEN = process.env.DEVICE_TOKEN || '';
 const DEVICE_ID = process.env.DEVICE_ID || '';
 
@@ -636,7 +638,8 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
                 'Connection': 'keep-alive',
                 'Accept': '*/*',
                 'Accept-Encoding': 'deflate, gzip',
-                'Authorization': serverKeyAuth
+                'Authorization': serverKeyAuth,
+                'x-unity-version': '6000.3.12f1'
             },
             body: JSON.stringify(body),
             signal: controller.signal
@@ -707,17 +710,19 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
 
 // --- AUTO RE-AUTH FROM DEVICE (when refresh token dies) ---
 async function autoReAuthFromDevice() {
-    // Need at minimum a DEVICE_ID — if no DEVICE_TOKEN, we use DEVICE_ID as the token
-    // (Nakama device auth just needs a stable unique identifier)
+    // Validate both credentials
     if (!DEVICE_ID) {
-        console.log('[TMC] !! No DEVICE_ID env var set — cannot auto re-auth !!');
-        console.log('[TMC] !! Set DEVICE_ID in your environment to enable auto re-auth !!');
-        console.log('[TMC] !! Your device ID from yaml: a60f8dba6c418f905d889bca18d7aa36c9343c23 !!');
-        return { success: false, error: 'No DEVICE_ID configured. Set DEVICE_ID env var.' };
+        console.log('[TMC] !! DEVICE_ID not set — cannot auto re-auth !!');
+        console.log('[TMC] !! Set DEVICE_ID env var (e.g. a60f8dba6c418f905d889bca18d7aa36c9343c23) !!');
+        return { success: false, error: 'No DEVICE_ID configured.' };
     }
-    
-    // Use DEVICE_TOKEN if provided, otherwise fall back to DEVICE_ID as the token
-    const authToken = DEVICE_TOKEN || DEVICE_ID;
+    if (!DEVICE_TOKEN || DEVICE_TOKEN.length < 50) {
+        console.log('[TMC] !! DEVICE_TOKEN not set or too short — cannot auto re-auth !!');
+        console.log('[TMC] !! DEVICE_TOKEN must be the LONG hex auth token from the game, NOT the device ID !!');
+        console.log('[TMC] !! It looks like: 140000003124252097EDD94B5D1DCB1601001001AA342F6A... !!');
+        console.log('[TMC] !! Find it in Insomnia > authdevice request > body > "token" field !!');
+        return { success: false, error: 'No valid DEVICE_TOKEN configured (needs the long hex blob).' };
+    }
     
     if (isReAuthing) {
         console.log('[TMC] Re-auth already in progress, skipping...');
@@ -726,7 +731,7 @@ async function autoReAuthFromDevice() {
     
     isReAuthing = true;
     console.log('[TMC] ==========================================');
-    console.log('[TMC] AUTO RE-AUTH: Refresh token dead, re-authenticating via device auth...');
+    console.log('[TMC] AUTO RE-AUTH: Re-authenticating via device auth...');
     console.log('[TMC] ==========================================');
     
     try {
@@ -754,7 +759,7 @@ async function autoReAuthFromDevice() {
                     const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
 
                     const body = {
-                        token: authToken,
+                        token: DEVICE_TOKEN,
                         vars: {
                             clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
                             deviceID: DEVICE_ID
@@ -769,7 +774,8 @@ async function autoReAuthFromDevice() {
                             'Connection': 'keep-alive',
                             'Accept': '*/*',
                             'Accept-Encoding': 'deflate, gzip',
-                            'Authorization': serverKeyAuth
+                            'Authorization': serverKeyAuth,
+                            'x-unity-version': '6000.3.12f1'
                         },
                         body: JSON.stringify(body),
                         signal: controller.signal
@@ -1121,7 +1127,14 @@ function scheduleNextRefresh() {
 
 function startAutoRefresh() {
     console.log('[TMC] Smart auto-refresh starting');
-    console.log(`[TMC] Device auth: ${DEVICE_ID ? (DEVICE_TOKEN ? 'DEVICE_TOKEN + DEVICE_ID set' : 'DEVICE_ID set (using as token)') : 'NOT SET — set DEVICE_ID env var for auto re-auth'}`);
+    if (!DEVICE_ID) {
+        console.log('[TMC] !! DEVICE_ID NOT SET — auto re-auth will not work !!');
+    } else if (!DEVICE_TOKEN || DEVICE_TOKEN.length < 50) {
+        console.log('[TMC] !! DEVICE_TOKEN NOT SET or invalid — auto re-auth will not work !!');
+        console.log('[TMC] !! DEVICE_TOKEN must be the long hex auth token (NOT the device ID) !!');
+    } else {
+        console.log('[TMC] Device auth: READY (DEVICE_ID + DEVICE_TOKEN both set)');
+    }
     isRefreshing = false;
     isReAuthing = false;
     failedQueue = [];
@@ -1612,7 +1625,7 @@ client.on('interactionCreate', async interaction => {
                 const health = getRefreshHealthStatus();
                 const accessStatus = health.accessRemainingMs > 0 ? `Access: **${formatRemainingTime(tokenLifetime.accessExpiresAt)}**` : 'Access: **EXPIRED**';
                 const refreshStatus = health.refreshRemainingMs > 0 ? `Refresh: **${formatRemainingTime(tokenLifetime.refreshExpiresAt)}**` : 'Refresh: **EXPIRED**';
-                const deviceStatus = DEVICE_ID ? (DEVICE_TOKEN ? 'Device Auth: **FULL**' : 'Device Auth: **ID only**') : 'Device Auth: **NOT SET**';
+                const deviceStatus = DEVICE_ID ? (DEVICE_TOKEN && DEVICE_TOKEN.length >= 50 ? 'Device Auth: **READY**' : 'Device Auth: **MISSING TOKEN**') : 'Device Auth: **NOT SET**';
                 const reAuthStatus = isReAuthing ? 'Re-auth: **IN PROGRESS**' : '';
                 
                 const embed = new EmbedBuilder()
