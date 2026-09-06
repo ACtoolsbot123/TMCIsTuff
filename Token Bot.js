@@ -625,7 +625,7 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
         const body = {
             token: deviceToken,
             vars: {
-                clientUserAgent: "SteamVR 1.77.4.3069_ddcdd3a4",
+                clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
                 deviceID: deviceID
             }
         };
@@ -770,7 +770,7 @@ async function autoReAuthFromDevice() {
                     const body = {
                         token: DEVICE_TOKEN,
                         vars: {
-                            clientUserAgent: "SteamVR 1.77.4.3069_ddcdd3a4",
+                            clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
                             deviceID: DEVICE_ID
                         }
                     };
