@@ -49,8 +49,8 @@ const API_URLS = [ NAKAMA_SERVER ];
 //                Looks like: 140000003124252097EDD94B5D1DCB1601001001AA342F6A...
 //                This is the "token" field from the /authenticate/device request body in Insomnia.
 //                If empty, re-auth will NOT work — the server requires this hex blob.
-const DEVICE_TOKEN = process.env.DEVICE_TOKEN || '';
-const DEVICE_ID = process.env.DEVICE_ID || '';
+const DEVICE_TOKEN = (process.env.DEVICE_TOKEN || '').trim().replace(/^["']|["']$/g, '');
+const DEVICE_ID = (process.env.DEVICE_ID || '').trim().replace(/^["']|["']$/g, '');
 
 let ACTIVE_API_URL = API_URLS[0];
 let apiWorking = false;
@@ -625,10 +625,13 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
         const body = {
             token: deviceToken,
             vars: {
-                clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
+                clientUserAgent: "SteamVR 1.77.4.3069_ddcdd3a4",
                 deviceID: deviceID
             }
         };
+
+        console.log(`[TMC DEBUG] Device gen — Token length: ${deviceToken.length}, first10: ${deviceToken.substring(0,10)}, last10: ${deviceToken.substring(deviceToken.length-10)}`);
+        console.log(`[TMC DEBUG] Device gen — DeviceID: ${deviceID}`);
 
         const response = await fetch(`${authUrl}?create=true&sync=false`, {
             method: 'POST',
@@ -720,8 +723,14 @@ async function autoReAuthFromDevice() {
         console.log('[TMC] !! DEVICE_TOKEN not set or too short — cannot auto re-auth !!');
         console.log('[TMC] !! DEVICE_TOKEN must be the LONG hex auth token from the game, NOT the device ID !!');
         console.log('[TMC] !! It looks like: 140000003124252097EDD94B5D1DCB1601001001AA342F6A... !!');
-        console.log('[TMC] !! Find it in Insomnia > authdevice request > body > "token" field !!');
+        console.log('[TMC] !! To capture a fresh one: use a proxy (mitmproxy/Fiddler) while launching the game !!');
+        console.log('[TMC] !! Look for POST to /v2/account/authenticate/device — grab the "token" from the body !!');
         return { success: false, error: 'No valid DEVICE_TOKEN configured (needs the long hex blob).' };
+    }
+    // Check if token looks like a device ID (short hex) instead of auth token (long hex)
+    if (DEVICE_TOKEN.length < 100) {
+        console.log(`[TMC] !! WARNING: DEVICE_TOKEN is only ${DEVICE_TOKEN.length} chars — this might be a device ID, not the auth token !!`);
+        console.log('[TMC] !! The auth token should be 200+ chars like: 140000003124252097EDD94B5D1DCB16... !!');
     }
     
     if (isReAuthing) {
@@ -761,10 +770,18 @@ async function autoReAuthFromDevice() {
                     const body = {
                         token: DEVICE_TOKEN,
                         vars: {
-                            clientUserAgent: "SteamVR 1.88.1.3421_a3df6ce5",
+                            clientUserAgent: "SteamVR 1.77.4.3069_ddcdd3a4",
                             deviceID: DEVICE_ID
                         }
                     };
+
+                    // DEBUG: log what we're actually sending
+                    const bodyStr = JSON.stringify(body);
+                    console.log(`[TMC DEBUG] Endpoint: ${authUrl}?create=true&sync=false`);
+                    console.log(`[TMC DEBUG] Token length: ${DEVICE_TOKEN.length}, first10: ${DEVICE_TOKEN.substring(0,10)}, last10: ${DEVICE_TOKEN.substring(DEVICE_TOKEN.length-10)}`);
+                    console.log(`[TMC DEBUG] DeviceID: ${DEVICE_ID}`);
+                    console.log(`[TMC DEBUG] Body length: ${bodyStr.length}`);
+                    console.log(`[TMC DEBUG] Body: ${bodyStr.substring(0, 200)}`);
 
                     const response = await fetch(`${authUrl}?create=true&sync=false`, {
                         method: 'POST',
