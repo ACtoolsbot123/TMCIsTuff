@@ -169,10 +169,10 @@ function updateTokenLifetimeTracking(bearer, refreshToken) {
 }
 
 function getOptimalRefreshDelay() {
-    // Refresh at 40% of access token lifetime, but clamp between 30s and 30min
+    // Refresh at 25% of access token lifetime (more aggressive), clamp between 15s and 30min
     const bearerLife = getTokenLifetimeMs(DEFAULT_TOKEN.bearer);
-    const delay = Math.floor(bearerLife * 0.4);
-    const clamped = Math.max(30000, Math.min(delay, 30 * 60 * 1000));
+    const delay = Math.floor(bearerLife * 0.25);
+    const clamped = Math.max(15000, Math.min(delay, 30 * 60 * 1000));
     return clamped;
 }
 
@@ -248,14 +248,14 @@ async function validateSteamToken(bearerToken) {
     };
 }
 
-// --- SAFETY: reset stuck refresh lock after 30s ---
+// --- SAFETY: reset stuck refresh lock after 15s ---
 setInterval(() => {
     if (isRefreshing) {
         console.log('[TMC] Safety: refreshing lock was stuck, force-releasing');
         isRefreshing = false;
         processQueue(new Error('Refresh lock timeout'), null);
     }
-}, 30000);
+}, 15000);
 
 // --- REFRESH TOKEN ---
 async function refreshToken(refreshTk) {
@@ -459,6 +459,7 @@ async function refreshToken(refreshTk) {
                         processQueue(null, result);
                         isRefreshing = false;
                         console.log('[TMC] Refresh lock released');
+                        saveTokenState();
                         return result;
                     }
 
@@ -687,6 +688,7 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
             updateTokenLifetimeTracking(newBearer, newRefresh);
 
             console.log(`[TMC] Device auth token generated! ${humanExpiry(newExpiry)}`);
+            saveTokenState();
             return {
                 success: true,
                 bearer: newBearer,
@@ -735,10 +737,10 @@ async function autoReAuthFromDevice() {
             urlsToTry.unshift(ACTIVE_API_URL);
         }
         
-        // Try both auth endpoints — game uses /authenticate/steam, standard nakama uses /authenticate/device
+        // Try both auth endpoints — device auth first (primary), then steam as fallback
         const authEndpoints = [
-            '/v2/account/authenticate/steam',
-            '/v2/account/authenticate/device'
+            '/v2/account/authenticate/device',
+            '/v2/account/authenticate/steam'
         ];
 
         for (const url of urlsToTry) {
@@ -858,6 +860,7 @@ async function autoReAuthFromDevice() {
                         // Process any queued requests
                         processQueue(null, { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry, newToken: true });
                         
+                        saveTokenState();
                         return { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry };
                     } else {
                         const errMsg = data ? (data.message || data.error || JSON.stringify(data)) : 'no body';
@@ -929,23 +932,98 @@ async function refreshTokenInStock() {
     }
 }
 
+// --- TOKEN PERSISTENCE (saves to file so restarts don't kill tokens) ---
+const fs = require('fs');
+const path = require('path');
+const TOKEN_STATE_FILE = path.join(process.cwd(), 'token_state.json');
+
+function saveTokenState() {
+    try {
+        const state = {
+            bearer: DEFAULT_TOKEN.bearer,
+            refresh_token: DEFAULT_TOKEN.refresh_token,
+            tokenLifetime: { ...tokenLifetime },
+            savedAt: Date.now()
+        };
+        fs.writeFileSync(TOKEN_STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
+        console.log('[TMC] Token state saved to file');
+    } catch (err) {
+        console.error('[TMC] Failed to save token state:', err.message);
+    }
+}
+
+function loadTokenState() {
+    try {
+        if (!fs.existsSync(TOKEN_STATE_FILE)) {
+            console.log('[TMC] No saved token state found, using defaults');
+            return false;
+        }
+        const raw = fs.readFileSync(TOKEN_STATE_FILE, 'utf-8');
+        const state = JSON.parse(raw);
+        
+        if (!state.bearer || !isValidJwt(state.bearer)) {
+            console.log('[TMC] Saved bearer token invalid, using defaults');
+            return false;
+        }
+        
+        const bearerExp = getTokenExpiryMs(state.bearer);
+        const now = Date.now();
+        
+        // If saved bearer is still valid, use it
+        if (bearerExp > now) {
+            DEFAULT_TOKEN.bearer = state.bearer;
+            if (state.refresh_token && isValidJwt(state.refresh_token)) {
+                DEFAULT_TOKEN.refresh_token = state.refresh_token;
+            }
+            console.log(`[TMC] Loaded saved token state — access: ${humanExpiry(bearerExp)}`);
+            return true;
+        }
+        
+        // Bearer expired but refresh might still work
+        if (state.refresh_token && isValidJwt(state.refresh_token)) {
+            const refreshExp = getTokenExpiryMs(state.refresh_token);
+            if (refreshExp > now) {
+                DEFAULT_TOKEN.bearer = state.bearer;
+                DEFAULT_TOKEN.refresh_token = state.refresh_token;
+                console.log(`[TMC] Loaded saved state — bearer expired but refresh alive: ${humanExpiry(refreshExp)}`);
+                return true;
+            }
+        }
+        
+        console.log('[TMC] Saved tokens all expired, using defaults');
+        return false;
+    } catch (err) {
+        console.error('[TMC] Failed to load token state:', err.message);
+        return false;
+    }
+}
+
+// Auto-save token state every 5 minutes
+setInterval(() => {
+    if (DEFAULT_TOKEN.bearer) saveTokenState();
+}, 5 * 60 * 1000);
+
 // --- SMART AUTO-REFRESH ---
 function scheduleNextRefresh() {
     if (refreshInterval) clearTimeout(refreshInterval);
     
-    const delay = getOptimalRefreshDelay();
     const accessTimeLeft = tokenLifetime.accessExpiresAt - Date.now();
     const refreshTimeLeft = tokenLifetime.refreshExpiresAt - Date.now();
     
-    // If refresh token is expired or about to expire, trigger re-auth instead of giving up
-    if (tokenLifetime.refreshExpiresAt > 0 && refreshTimeLeft <= 30 * 60 * 1000) {
+    // --- PRIORITY 1: Refresh token is critically low or dead ---
+    // Proactively re-auth via device to get a FRESH refresh token with full lifetime
+    // This is the KEY fix: don't wait until refresh token is almost dead
+    if (tokenLifetime.refreshExpiresAt > 0 && refreshTimeLeft <= 60 * 60 * 1000) {
         const minsLeft = Math.round(refreshTimeLeft / 60000);
         if (refreshTimeLeft <= 0) {
-            console.log('[TMC] Refresh token expired — triggering auto re-auth...');
+            console.log('[TMC] Refresh token EXPIRED — triggering auto re-auth...');
+        } else if (minsLeft <= 30) {
+            console.log(`[TMC] Refresh token CRITICAL (${minsLeft} min left) — triggering auto re-auth...`);
         } else {
-            console.log(`[TMC] Refresh token low (${minsLeft} min left) — triggering auto re-auth...`);
+            console.log(`[TMC] Refresh token getting low (${minsLeft} min left) — proactively re-authing to extend...`);
         }
         
+        const reAuthDelay = (refreshTimeLeft <= 0 || minsLeft <= 10) ? 1000 : 5000;
         refreshInterval = setTimeout(async () => {
             refreshInterval = null;
             if (isReAuthing) { scheduleNextRefresh(); return; }
@@ -953,37 +1031,47 @@ function scheduleNextRefresh() {
             
             const reAuthResult = await autoReAuthFromDevice();
             if (reAuthResult && reAuthResult.success) {
-                console.log('[TMC] Re-auth successful, resuming normal refresh cycle');
+                console.log('[TMC] Re-auth successful, fresh refresh token acquired — resuming normal cycle');
                 refreshRetryCount = 0;
+                saveTokenState();
             } else {
-                console.log('[TMC] Re-auth failed, retrying in 60s...');
+                console.log('[TMC] Re-auth failed, retrying in 30s...');
+                // Schedule a retry
+                refreshInterval = setTimeout(async () => {
+                    refreshInterval = null;
+                    if (!isReAuthing) {
+                        await autoReAuthFromDevice();
+                    }
+                    scheduleNextRefresh();
+                }, 30000);
+                return;
             }
             scheduleNextRefresh();
-        }, isReAuthing ? 5000 : 1000);
+        }, reAuthDelay);
         return;
     }
     
-    // If access token is still fresh, wait longer
-    let actualDelay = delay;
+    // --- PRIORITY 2: Access token needs refresh ---
+    let actualDelay;
     if (accessTimeLeft > 0) {
-        // Refresh when 40% of lifetime remains, minimum 30s
-        const refreshAt = Math.floor(accessTimeLeft * 0.4);
-        actualDelay = Math.max(30000, Math.min(refreshAt, 30 * 60 * 1000));
+        // Refresh at 25% of lifetime remaining (more aggressive than 40%)
+        const refreshAt = Math.floor(accessTimeLeft * 0.25);
+        actualDelay = Math.max(15000, Math.min(refreshAt, 30 * 60 * 1000));
     } else {
-        // Token expired, try again in 30 seconds
-        actualDelay = 30000;
-        console.log('[TMC] Access token expired! Retrying in 30s...');
+        // Token expired, try again in 15 seconds
+        actualDelay = 15000;
+        console.log('[TMC] Access token expired! Retrying in 15s...');
     }
     
-    // Warn if refresh token is getting low
+    // Warn if refresh token is getting low but not critical yet
     if (tokenLifetime.refreshExpiresAt > 0) {
         const refreshMinsLeft = Math.round(refreshTimeLeft / 60000);
-        if (refreshMinsLeft < 60 && refreshMinsLeft > 30) {
-            console.log(`[TMC] Refresh token: ${refreshMinsLeft} min remaining`);
+        if (refreshMinsLeft < 120 && refreshMinsLeft > 60) {
+            console.log(`[TMC] Refresh token: ${refreshMinsLeft} min remaining (will re-auth before it gets critical)`);
         }
     }
     
-    console.log(`[TMC] Next refresh in ${Math.round(actualDelay/1000)}s (${formatRemainingTime(tokenLifetime.accessExpiresAt)} access left)`);
+    console.log(`[TMC] Next refresh in ${Math.round(actualDelay/1000)}s (${accessTimeLeft > 0 ? formatRemainingTime(tokenLifetime.accessExpiresAt) + ' access left' : 'EXPIRED'})`);
     
     refreshInterval = setTimeout(async () => {
         refreshInterval = null;
@@ -994,16 +1082,22 @@ function scheduleNextRefresh() {
         
         if (!result || !result.success) {
             refreshRetryCount++;
-            // If refresh failed and it looks like a 401/token issue, try re-auth
             const errMsg = result ? (result.error || '') : '';
-            if (errMsg.includes('401') || errMsg.includes('expired') || errMsg.includes('invalid')) {
-                console.log('[TMC] Refresh failed with auth error — triggering auto re-auth...');
+            
+            // ANY auth-related failure triggers device re-auth (not just 401/expired/invalid)
+            const isAuthFailure = errMsg.includes('401') || errMsg.includes('expired') || errMsg.includes('invalid') || 
+                                  errMsg.includes('Unauthorized') || errMsg.includes('token') || errMsg.includes('auth');
+            
+            if (isAuthFailure || refreshRetryCount >= 3) {
+                console.log(`[TMC] Refresh failed (${isAuthFailure ? 'auth error' : 'max retries'}) — triggering auto re-auth...`);
                 refreshRetryCount = 0;
                 await autoReAuthFromDevice();
+                saveTokenState();
                 scheduleNextRefresh();
                 return;
             }
-            const retryDelay = Math.min(30000 * refreshRetryCount, 5 * 60 * 1000);
+            
+            const retryDelay = Math.min(15000 * refreshRetryCount, 3 * 60 * 1000);
             console.log(`[TMC] Refresh failed (attempt ${refreshRetryCount}), retrying in ${Math.round(retryDelay/1000)}s`);
             refreshInterval = setTimeout(async () => {
                 refreshInterval = null;
@@ -1011,16 +1105,15 @@ function scheduleNextRefresh() {
                 
                 const retryResult = await refreshTokenInStock();
                 if (!retryResult || !retryResult.success) {
-                    const retryErr = retryResult ? (retryResult.error || '') : '';
-                    if (retryErr.includes('401') || retryErr.includes('expired') || retryErr.includes('invalid')) {
-                        console.log('[TMC] Retry also failed with auth error — triggering auto re-auth...');
-                        await autoReAuthFromDevice();
-                    }
+                    console.log('[TMC] Retry also failed — triggering auto re-auth...');
+                    await autoReAuthFromDevice();
+                    saveTokenState();
                 }
                 scheduleNextRefresh();
             }, retryDelay);
         } else {
             refreshRetryCount = 0;
+            saveTokenState();
             scheduleNextRefresh();
         }
     }, actualDelay);
@@ -1034,22 +1127,31 @@ function startAutoRefresh() {
     failedQueue = [];
     refreshRetryCount = 0;
     
+    // Try to load saved token state from file
+    loadTokenState();
+    
     setTimeout(async () => {
         await findWorkingApiUrl();
         
         // Initialize token lifetime tracking
         updateTokenLifetimeTracking(DEFAULT_TOKEN.bearer, DEFAULT_TOKEN.refresh_token);
         
-        // Check if current refresh token is already expired — re-auth immediately
         const refreshTimeLeft = tokenLifetime.refreshExpiresAt - Date.now();
-        if (refreshTimeLeft <= 0) {
-            console.log('[TMC] Refresh token already expired on startup — re-authenticating...');
+        const accessTimeLeft = tokenLifetime.accessExpiresAt - Date.now();
+        
+        // Check if tokens are completely dead on startup
+        if (refreshTimeLeft <= 0 && accessTimeLeft <= 0) {
+            console.log('[TMC] Both tokens expired on startup — attempting device re-auth...');
             const reAuthResult = await autoReAuthFromDevice();
             if (!reAuthResult || !reAuthResult.success) {
-                console.log('[TMC] !! Startup re-auth failed. Bot will not work until device credentials are provided !!');
+                console.log('[TMC] !! Startup re-auth failed. Set DEVICE_ID env var for auto re-auth !!');
             }
+        } else if (refreshTimeLeft <= 60 * 60 * 1000) {
+            // Refresh token is low — proactively re-auth to get fresh one
+            console.log('[TMC] Refresh token low on startup — proactively re-authing for fresh token...');
+            await autoReAuthFromDevice();
         } else {
-            // Do first refresh to validate session
+            // Tokens look okay — do first refresh to validate session
             const result = await refreshTokenInStock();
             if (!result || !result.success) {
                 console.log('[TMC] First refresh failed, will attempt re-auth on next cycle');
@@ -1059,6 +1161,35 @@ function startAutoRefresh() {
         // Start smart scheduling
         scheduleNextRefresh();
     }, 5000);
+    
+    // --- WATCHDOG: check token health every 60 seconds ---
+    setInterval(async () => {
+        const now = Date.now();
+        const accessTimeLeft = tokenLifetime.accessExpiresAt - now;
+        const refreshTimeLeft = tokenLifetime.refreshExpiresAt - now;
+        
+        // If we have no refresh interval running and tokens exist, something stalled
+        if (!refreshInterval && !isRefreshing && !isReAuthing && DEFAULT_TOKEN.bearer) {
+            console.log('[TMC] Watchdog: no refresh scheduled — restarting cycle');
+            scheduleNextRefresh();
+        }
+        
+        // If refresh token is critically low and we're not already re-authing, force it
+        if (tokenLifetime.refreshExpiresAt > 0 && refreshTimeLeft <= 30 * 60 * 1000 && !isReAuthing && !isRefreshing) {
+            console.log('[TMC] Watchdog: refresh token critical — forcing re-auth');
+            await autoReAuthFromDevice();
+            saveTokenState();
+            scheduleNextRefresh();
+        }
+        
+        // If access token is expired and refresh didn't work in 2 minutes, emergency re-auth
+        if (accessTimeLeft <= 0 && refreshTimeLeft <= 0 && !isReAuthing) {
+            console.log('[TMC] Watchdog: both tokens dead — emergency device re-auth');
+            await autoReAuthFromDevice();
+            saveTokenState();
+            scheduleNextRefresh();
+        }
+    }, 60 * 1000);
 }
 
 // --- REFRESH ALL TOKENS HELPER ---
@@ -1152,6 +1283,8 @@ async function processTokenGeneration(interaction) {
         
         tokenStock.shift();
         tokenStock.push(tokenObj);
+        
+        saveTokenState();
         
         if (!hasNoCooldown) {
             cooldowns.set(`public_${userId}`, Date.now() + 5 * 60 * 1000);
@@ -1408,6 +1541,9 @@ const commandsData = [
 client.once('ready', async () => {
     console.log(`[TMC] ONLINE: ${client.user.tag}`);
     console.log(`[TMC] Connected to ${client.guilds.cache.size} server(s)`);
+
+    // Load saved token state first
+    loadTokenState();
 
     tokenStock = [{
         bearer: DEFAULT_TOKEN.bearer,
