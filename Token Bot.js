@@ -58,17 +58,11 @@ let isRefreshing = false;
 let isReAuthing = false;
 let failedQueue = [];
 let tokenStock = [];
-let refreshTokenStack = []; // history of refresh tokens — newest first, try all if one dies
-const MAX_REFRESH_STACK = 5;
 const cooldowns = new Map();
 const activeGenerations = new Map();
 let refreshInterval = null;
 let refreshRetryCount = 0;
 const MAX_REFRESH_RETRIES = 5;
-let deviceAuthDead = false;
-let lastReAuthAttempt = 0;
-const REAUTH_COOLDOWN_MS = 30 * 60 * 1000; // 30 min cooldown between re-auth attempts
-const INJECT_SECRET = process.env.INJECT_SECRET || 'tmc-inject-2026'; // simple auth for inject endpoint
 
 // --- TOKEN LIFETIME TRACKING ---
 let tokenLifetime = {
@@ -80,8 +74,8 @@ let tokenLifetime = {
 
 // --- DEFAULT TOKEN ---
 let DEFAULT_TOKEN = {
-  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJmZGYyMjdlOC1kMDFiLTQ1ODYtYjJhOC0zMGI3YTM5YmRlZjkiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6Ijk0NDgxZTNlMWJjODQ1MTQ4NDlkZGU2MWMzZDdmNGYwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg3MDQ5MjMsImlhdCI6MTc4ODcwMTMyM30.4MThYjqV0BzvM3QcSn0yFmPc730xosYPZ5jt5zzFSSI",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiJmZGYyMjdlOC1kMDFiLTQ1ODYtYjJhOC0zMGI3YTM5YmRlZjkiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6Ijk0NDgxZTNlMWJjODQ1MTQ4NDlkZGU2MWMzZDdmNGYwIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg3MjI5MjMsImlhdCI6MTc4ODcwMTMyM30.bkI6FZ7q8QW5kR53T5MQ1xZ0ML3e9OCLgGRhoN7Vbnc"
+  "bearer": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIwMGUyNmIyYS01ODQxLTQ0MmEtOWRlZS0wMTZlMzU5MTAwMDYiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImNiMzBhMWQ0MTg2YjRjN2RiMmFjNDRiZjE3YzUzYjUxIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg3MDYxMjYsImlhdCI6MTc4ODcwMjUyNn0.tIDrwtcSX2a2yZGRbissZKR_Nb9AlAaoLQMRaSI2PsQ",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0aWQiOiIwMGUyNmIyYS01ODQxLTQ0MmEtOWRlZS0wMTZlMzU5MTAwMDYiLCJ1aWQiOiJhMzQ5MTgxOS1lZGNkLTRiZDEtOTJkNS1hODJjZjk5NzBhNjYiLCJ1c24iOiIwelVHYjBrTVhyRGl0b1FYIiwidnJzIjp7ImF1dGhJRCI6ImNiMzBhMWQ0MTg2YjRjN2RiMmFjNDRiZjE3YzUzYjUxIiwiY2xpZW50VXNlckFnZW50IjoiU3RlYW1WUiA5Ljk5LjkuOTk5OV9mZmZmZmZmZiIsImRldmljZUlEIjoiMTgzNTc2MWMyYThiNmM2MjliOTlmZmY5ZWRmZjI4OWQ3ZjNlYTEyOCJ9LCJleHAiOjE3ODg3MjQxMjYsImlhdCI6MTc4ODcwMjUyNn0.oes66BjboEdmhtPjUNf-3cQRoK6iYlw8hRU5MIrBHe4"
 };
 
 // --- JWT HELPERS ---
@@ -267,31 +261,21 @@ setInterval(() => {
 
 // --- REFRESH TOKEN ---
 async function refreshToken(refreshTk) {
-    // Build list of tokens to try: input first, then stack
-    const tokensToTry = [refreshTk];
-    for (const st of refreshTokenStack) {
-        if (st !== refreshTk && !tokensToTry.includes(st)) tokensToTry.push(st);
-    }
-
-    for (const tk of tokensToTry) {
-        const result = await _refreshTokenSingle(tk);
-        if (result && result.success) return result;
-    }
-    return { success: false, error: 'All refresh tokens failed' };
-}
-
-async function _refreshTokenSingle(refreshTk) {
     try {
-        const refreshExp = getTokenExpiryMs(refreshTk);
-        const expired = Date.now() >= refreshExp;
+        console.log('[TMC] Attempting to refresh token...');
         
-        if (expired) {
-            console.log(`[TMC] Refresh token expired (${formatRemainingTime(refreshExp)} ago) — trying anyway (server grace period?)`);
-        } else {
-            const refreshLifeRemaining = refreshExp - Date.now();
-            if (refreshLifeRemaining < 5 * 60 * 1000) {
-                console.log(`[TMC] WARNING: Refresh token expires in ${formatRemainingTime(refreshExp)} — very low!`);
-            }
+        // Check if refresh token itself is expired before even trying
+        const refreshExp = getTokenExpiryMs(refreshTk);
+        if (Date.now() >= refreshExp) {
+            console.log('[TMC] Refresh token is EXPIRED. Cannot refresh.');
+            return { success: false, error: 'Refresh token expired. Need fresh device auth.' };
+        }
+        
+        const refreshLifeRemaining = refreshExp - Date.now();
+        if (refreshLifeRemaining < 5 * 60 * 1000) {
+            console.log(`[TMC] WARNING: Refresh token expires in ${formatRemainingTime(refreshExp)} — very low!`);
+        } else if (refreshLifeRemaining < 30 * 60 * 1000) {
+            console.log(`[TMC] NOTICE: Refresh token expires in ${formatRemainingTime(refreshExp)}`);
         }
         
         if (isRefreshing) {
@@ -302,9 +286,12 @@ async function _refreshTokenSingle(refreshTk) {
         }
 
         isRefreshing = true;
+        console.log('[TMC] Refresh lock acquired');
 
         const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
-        const MAX_RETRIES = 2;
+
+        // Try each URL with a retry per URL
+        const MAX_RETRIES_PER_URL = 2;
         const allErrors = [];
 
         const urlsToTry = [...API_URLS];
@@ -314,9 +301,10 @@ async function _refreshTokenSingle(refreshTk) {
         }
 
         for (const url of urlsToTry) {
-            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            for (let attempt = 1; attempt <= MAX_RETRIES_PER_URL; attempt++) {
                 try {
                     const refreshUrl = `${url}/v2/account/session/refresh`;
+                    console.log(`[TMC] Trying refresh at: ${refreshUrl} (attempt ${attempt}/${MAX_RETRIES_PER_URL})`);
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 20000);
 
@@ -332,64 +320,101 @@ async function _refreshTokenSingle(refreshTk) {
                     });
                     clearTimeout(timeoutId);
 
+                    // Try to read response body regardless of status
                     let data = null;
                     let rawBody = '';
                     try {
                         rawBody = await response.text();
                         data = JSON.parse(rawBody);
                     } catch (parseErr) {
+                        // Non-JSON response (HTML error page from cloudflare, etc.)
                         const snippet = rawBody.substring(0, 150).replace(/\s+/g, ' ');
-                        console.log(`[TMC] ${url} (${attempt}) - Non-JSON (status ${response.status}): ${snippet}`);
-                        allErrors.push(`${url}: non-JSON (${response.status})`);
-                        if (response.status >= 500 && attempt < MAX_RETRIES) {
+                        console.log(`[TMC] ${url} (attempt ${attempt}) - Non-JSON response (status ${response.status}): ${snippet}`);
+                        allErrors.push(`${url}: non-JSON (status ${response.status})`);
+                        
+                        // If it's a server error (5xx), retry this URL
+                        if (response.status >= 500 && attempt < MAX_RETRIES_PER_URL) {
+                            console.log(`[TMC] Server error, retrying in 2s...`);
+                            await new Promise(r => setTimeout(r, 2000));
+                            continue;
+                        }
+                        break; // Move to next URL
+                    }
+
+                    console.log(`[TMC] ${url} - Status: ${response.status}, Body:`, JSON.stringify(data).substring(0, 300));
+
+                    // Extract token from response — handle ALL known formats
+                    let newBearer = null;
+                    let newRefresh = null;
+
+                    if (data.token) {
+                        newBearer = data.token;
+                        newRefresh = data.refresh_token || refreshTk;
+                    } else if (data.access_token) {
+                        newBearer = data.access_token;
+                        newRefresh = data.refresh_token || refreshTk;
+                    } else if (data.bearer) {
+                        newBearer = data.bearer;
+                        newRefresh = data.refresh_token || refreshTk;
+                    } else if (data.session_token) {
+                        newBearer = data.session_token;
+                        newRefresh = data.refresh_token || refreshTk;
+                    }
+
+                    // Handle 401 — server says token is invalid
+                    if (response.status === 401) {
+                        const errMsg = data ? (data.message || data.error || JSON.stringify(data)) : 'no body';
+                        console.log(`[TMC] ${url} - 401 Unauthorized: ${errMsg}`);
+                        allErrors.push(`${url}: 401 - ${errMsg}`);
+                        
+                        // If we got a token back despite 401, still try to use it
+                        if (newBearer) {
+                            console.log(`[TMC] Got token despite 401, attempting to use it...`);
+                        } else {
+                            if (attempt < MAX_RETRIES_PER_URL) {
+                                await new Promise(r => setTimeout(r, 2000));
+                            }
+                            continue;
+                        }
+                    }
+
+                    // Handle 429 — rate limited
+                    if (response.status === 429) {
+                        console.log(`[TMC] ${url} - Rate limited! Waiting 5s before retry...`);
+                        allErrors.push(`${url}: 429 rate limited`);
+                        if (attempt < MAX_RETRIES_PER_URL) {
+                            await new Promise(r => setTimeout(r, 5000));
+                            continue;
+                        }
+                        break;
+                    }
+
+                    // Handle 5xx — server error, retry
+                    if (response.status >= 500) {
+                        console.log(`[TMC] ${url} - Server error ${response.status}`);
+                        allErrors.push(`${url}: ${response.status} server error`);
+                        if (attempt < MAX_RETRIES_PER_URL) {
                             await new Promise(r => setTimeout(r, 2000));
                             continue;
                         }
                         break;
                     }
 
-                    let newBearer = null;
-                    let newRefresh = null;
-
-                    if (data.token) { newBearer = data.token; newRefresh = data.refresh_token || refreshTk; }
-                    else if (data.access_token) { newBearer = data.access_token; newRefresh = data.refresh_token || refreshTk; }
-                    else if (data.bearer) { newBearer = data.bearer; newRefresh = data.refresh_token || refreshTk; }
-                    else if (data.session_token) { newBearer = data.session_token; newRefresh = data.refresh_token || refreshTk; }
-
-                    // 401 — try next token in stack
-                    if (response.status === 401) {
-                        console.log(`[TMC] 401 with this refresh token — will try next in stack`);
-                        allErrors.push(`${url}: 401`);
-                        isRefreshing = false;
-                        return { success: false, error: '401' };
-                    }
-
-                    // 429 — rate limited
-                    if (response.status === 429) {
-                        console.log(`[TMC] Rate limited, waiting 5s...`);
-                        allErrors.push(`${url}: 429`);
-                        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 5000));
-                        continue;
-                    }
-
-                    // 5xx — server error, retry
-                    if (response.status >= 500) {
-                        allErrors.push(`${url}: ${response.status}`);
-                        if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 2000));
-                        continue;
-                    }
-
-                    // SUCCESS
+                    // SUCCESS: 200 with a token
                     if (response.status === 200 && newBearer) {
                         const newExpiry = getTokenExpiryMs(newBearer);
-                        const newRefreshExpiry = newRefresh ? getTokenExpiryMs(newRefresh) : 0;
+                        const newRefreshExpiry = getTokenExpiryMs(newRefresh);
 
                         if (newExpiry <= Date.now()) {
+                            console.log(`[TMC] ${url} - Refreshed token already expired, skipping`);
                             allErrors.push(`${url}: returned expired token`);
                             continue;
                         }
 
-                        console.log(`[TMC] REFRESH OK — Access: ${humanExpiry(newExpiry)}, Refresh: ${newRefreshExpiry > 0 ? humanExpiry(newRefreshExpiry) : 'same'}`);
+                        console.log(`[TMC] Successfully refreshed token via ${url}!`);
+                        console.log(`[TMC] New Bearer: ${newBearer.substring(0, 50)}...`);
+                        console.log(`[TMC] New Refresh: ${newRefresh.substring(0, 50)}...`);
+                        console.log(`[TMC] Access: ${humanExpiry(newExpiry)}, Refresh: ${humanExpiry(newRefreshExpiry)}`);
 
                         DEFAULT_TOKEN.bearer = newBearer;
                         DEFAULT_TOKEN.refresh_token = newRefresh;
@@ -397,71 +422,82 @@ async function _refreshTokenSingle(refreshTk) {
                         apiWorking = true;
                         refreshRetryCount = 0;
 
-                        // Push new refresh token to stack (if different)
-                        pushRefreshTokenToStack(newRefresh);
-
+                        // Update token lifetime tracking
                         updateTokenLifetimeTracking(newBearer, newRefresh);
 
                         if (tokenStock.length > 0) {
+                            const oldToken = tokenStock[0];
                             tokenStock[0] = {
-                                bearer: newBearer, refresh: newRefresh,
-                                addedAt: Date.now(), expiresAt: newExpiry,
+                                bearer: newBearer,
+                                refresh: newRefresh,
+                                addedAt: Date.now(),
+                                expiresAt: newExpiry,
                                 refreshExpiresAt: newRefreshExpiry,
-                                id: tokenStock[0].id || '', userId: tokenStock[0].userId || 'system',
-                                username: tokenStock[0].username || 'System'
+                                id: oldToken.id,
+                                userId: oldToken.userId,
+                                username: oldToken.username
                             };
                         } else {
                             tokenStock.push({
-                                bearer: newBearer, refresh: newRefresh,
-                                addedAt: Date.now(), expiresAt: newExpiry,
+                                bearer: newBearer,
+                                refresh: newRefresh,
+                                addedAt: Date.now(),
+                                expiresAt: newExpiry,
                                 refreshExpiresAt: newRefreshExpiry,
-                                id: '', userId: 'system', username: 'System'
+                                id: '',
+                                userId: 'system',
+                                username: 'System'
                             });
                         }
 
-                        const result = {
-                            success: true, bearer: newBearer, refresh: newRefresh,
-                            expiresAt: newExpiry, refreshExpiresAt: newRefreshExpiry, newToken: true
+                        const result = { 
+                            success: true, 
+                            bearer: newBearer, 
+                            refresh: newRefresh, 
+                            expiresAt: newExpiry,
+                            refreshExpiresAt: newRefreshExpiry,
+                            newToken: true
                         };
                         processQueue(null, result);
                         isRefreshing = false;
-                        saveTokenState(); // save after EVERY successful refresh
+                        console.log('[TMC] Refresh lock released');
+                        saveTokenState();
                         return result;
                     }
 
-                    allErrors.push(`${url}: 200 but no token`);
+                    // 200 but no token in response — log and move on
+                    console.log(`[TMC] ${url} - Got 200 but no token in response`);
+                    allErrors.push(`${url}: 200 but no token field`);
 
                 } catch (err) {
-                    const errMsg = err.name === 'AbortError' ? 'timeout' : err.message;
+                    const errMsg = err.name === 'AbortError' ? 'timeout (20s)' : err.message;
+                    console.log(`[TMC] ${url} (attempt ${attempt}) - ${errMsg}`);
                     allErrors.push(`${url}: ${errMsg}`);
-                    if (attempt < MAX_RETRIES) await new Promise(r => setTimeout(r, 2000));
+                    
+                    // On network/timeout errors, retry with delay
+                    if (attempt < MAX_RETRIES_PER_URL) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
                 }
             }
         }
 
-        console.log(`[TMC] Refresh failed: ${allErrors.join(' | ')}`);
+        console.log('[TMC] All refresh URLs failed. Errors:', allErrors.join(' | '));
         refreshRetryCount++;
+        
+        if (tokenStock.length > 0) {
+            tokenStock[0].expiresAt = getTokenExpiryMs(tokenStock[0].bearer);
+        }
+
+        processQueue(new Error('All refresh URLs failed'), null);
         isRefreshing = false;
-        return { success: false, error: allErrors[allErrors.length - 1], retryCount: refreshRetryCount };
+        return { success: false, error: `All refresh URLs failed: ${allErrors[allErrors.length - 1]}`, retryCount: refreshRetryCount, allErrors };
     } catch (err) {
         console.error('[TMC] Refresh error:', err.message);
+        processQueue(err, null);
         isRefreshing = false;
         return { success: false, error: err.message };
     }
-}
-
-// --- PUSH REFRESH TOKEN TO STACK (dedupe, newest first, max 5) ---
-function pushRefreshTokenToStack(tk) {
-    if (!tk || typeof tk !== 'string') return;
-    // Remove if already exists
-    refreshTokenStack = refreshTokenStack.filter(t => t !== tk);
-    // Push newest to front
-    refreshTokenStack.unshift(tk);
-    // Trim to max
-    if (refreshTokenStack.length > MAX_REFRESH_STACK) {
-        refreshTokenStack = refreshTokenStack.slice(0, MAX_REFRESH_STACK);
-    }
-    console.log(`[TMC] Refresh token stack: ${refreshTokenStack.length} token(s)`);
 }
 
 // --- REFRESH SPECIFIC TOKEN (by bearer + refresh input) ---
@@ -745,30 +781,24 @@ async function freshDeviceAuth() {
 
 // --- AUTO RE-AUTH FROM DEVICE (when refresh token dies) ---
 async function autoReAuthFromDevice() {
-    // If device auth is already confirmed dead, don't bother
-    if (deviceAuthDead) {
-        console.log('[TMC] Device auth confirmed dead (400) — skipping. POST to /inject to add fresh tokens.');
-        return { success: false, error: 'Device auth dead — use /inject endpoint' };
-    }
-
-    // Respect cooldown
-    const now = Date.now();
-    if (now - lastReAuthAttempt < REAUTH_COOLDOWN_MS) {
-        const cooldownLeft = Math.round((REAUTH_COOLDOWN_MS - (now - lastReAuthAttempt)) / 60000);
-        console.log(`[TMC] Re-auth cooldown — try again in ${cooldownLeft}min. POST to /inject to skip.`);
-        return { success: false, error: `Re-auth cooldown — ${cooldownLeft}min remaining` };
-    }
-    
     // Validate both credentials
     if (!DEVICE_ID) {
         console.log('[TMC] !! DEVICE_ID not set — cannot auto re-auth !!');
-        console.log('[TMC] !! POST fresh tokens to /inject endpoint instead !!');
+        console.log('[TMC] !! Set DEVICE_ID env var (e.g. a60f8dba6c418f905d889bca18d7aa36c9343c23) !!');
         return { success: false, error: 'No DEVICE_ID configured.' };
     }
     if (!DEVICE_TOKEN || DEVICE_TOKEN.length < 50) {
-        console.log('[TMC] !! DEVICE_TOKEN not set — cannot auto re-auth !!');
-        console.log('[TMC] !! POST fresh tokens to /inject endpoint instead !!');
-        return { success: false, error: 'No valid DEVICE_TOKEN configured.' };
+        console.log('[TMC] !! DEVICE_TOKEN not set or too short — cannot auto re-auth !!');
+        console.log('[TMC] !! DEVICE_TOKEN must be the LONG hex auth token from the game, NOT the device ID !!');
+        console.log('[TMC] !! It looks like: 140000003124252097EDD94B5D1DCB1601001001AA342F6A... !!');
+        console.log('[TMC] !! To capture a fresh one: use a proxy (mitmproxy/Fiddler) while launching the game !!');
+        console.log('[TMC] !! Look for POST to /v2/account/authenticate/device — grab the "token" from the body !!');
+        return { success: false, error: 'No valid DEVICE_TOKEN configured (needs the long hex blob).' };
+    }
+    // Check if token looks like a device ID (short hex) instead of auth token (long hex)
+    if (DEVICE_TOKEN.length < 100) {
+        console.log(`[TMC] !! WARNING: DEVICE_TOKEN is only ${DEVICE_TOKEN.length} chars — this might be a device ID, not the auth token !!`);
+        console.log('[TMC] !! The auth token should be 200+ chars like: 140000003124252097EDD94B5D1DCB16... !!');
     }
     
     if (isReAuthing) {
@@ -777,9 +807,8 @@ async function autoReAuthFromDevice() {
     }
     
     isReAuthing = true;
-    lastReAuthAttempt = Date.now();
     console.log('[TMC] ==========================================');
-    console.log('[TMC] AUTO RE-AUTH: Attempting device auth (will not retry for 30min if 400)...');
+    console.log('[TMC] AUTO RE-AUTH: Re-authenticating via device auth...');
     console.log('[TMC] ==========================================');
     
     try {
@@ -857,17 +886,6 @@ async function autoReAuthFromDevice() {
                     }
 
                     console.log(`[TMC] Re-auth response (status ${response.status}):`, JSON.stringify(data).substring(0, 300));
-
-                    // 400 = token consumed/expired — device auth is dead, stop retrying
-                    if (response.status === 400) {
-                        console.log('[TMC] !! Device auth ticket is CONSUMED/DEAD (400) — will not retry !!');
-                        console.log('[TMC] !! The Steam auth ticket was already used by the game !!');
-                        console.log('[TMC] !! To recover: POST fresh tokens to /inject endpoint or use Discord /inject !!');
-                        deviceAuthDead = true;
-                        isReAuthing = false;
-                        processQueue(new Error('Device auth dead (400) — use /inject'), null);
-                        return { success: false, error: 'Device auth dead (400)' };
-                    }
 
                     let newBearer = null;
                     let newRefresh = null;
@@ -1019,11 +1037,11 @@ function saveTokenState() {
         const state = {
             bearer: DEFAULT_TOKEN.bearer,
             refresh_token: DEFAULT_TOKEN.refresh_token,
-            refreshTokenStack: refreshTokenStack.slice(0, MAX_REFRESH_STACK),
             tokenLifetime: { ...tokenLifetime },
             savedAt: Date.now()
         };
         fs.writeFileSync(TOKEN_STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
+        console.log('[TMC] Token state saved to file');
     } catch (err) {
         console.error('[TMC] Failed to save token state:', err.message);
     }
@@ -1052,11 +1070,6 @@ function loadTokenState() {
             if (state.refresh_token && isValidJwt(state.refresh_token)) {
                 DEFAULT_TOKEN.refresh_token = state.refresh_token;
             }
-            // Restore refresh token stack
-            if (Array.isArray(state.refreshTokenStack)) {
-                refreshTokenStack = state.refreshTokenStack.filter(t => isValidJwt(t));
-                if (refreshTokenStack.length > 0) console.log(`[TMC] Restored ${refreshTokenStack.length} refresh token(s) from stack`);
-            }
             console.log(`[TMC] Loaded saved token state — access: ${humanExpiry(bearerExp)}`);
             return true;
         }
@@ -1067,11 +1080,6 @@ function loadTokenState() {
             if (refreshExp > now) {
                 DEFAULT_TOKEN.bearer = state.bearer;
                 DEFAULT_TOKEN.refresh_token = state.refresh_token;
-                // Restore refresh token stack
-                if (Array.isArray(state.refreshTokenStack)) {
-                    refreshTokenStack = state.refreshTokenStack.filter(t => isValidJwt(t));
-                    if (refreshTokenStack.length > 0) console.log(`[TMC] Restored ${refreshTokenStack.length} refresh token(s) from stack`);
-                }
                 console.log(`[TMC] Loaded saved state — bearer expired but refresh alive: ${humanExpiry(refreshExp)}`);
                 return true;
             }
@@ -1085,10 +1093,10 @@ function loadTokenState() {
     }
 }
 
-// Auto-save token state every 2 minutes (safety net)
+// Auto-save token state every 5 minutes
 setInterval(() => {
     if (DEFAULT_TOKEN.bearer) saveTokenState();
-}, 2 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 // --- AUTO-REFRESH: every 60 seconds, no matter what ---
 const REFRESH_INTERVAL_MS = 60 * 1000; // 60 seconds
@@ -1101,16 +1109,12 @@ function scheduleNextRefresh() {
 
     // --- Refresh token dead or critical → full device re-auth ---
     if (tokenLifetime.refreshExpiresAt > 0 && refreshTimeLeft <= 0) {
-        console.log('[TMC] Refresh token EXPIRED — checking re-auth options...');
+        console.log('[TMC] Refresh token EXPIRED — triggering device re-auth...');
         refreshInterval = setTimeout(async () => {
             refreshInterval = null;
             if (isReAuthing) { scheduleNextRefresh(); return; }
-            if (!deviceAuthDead) {
-                if (!apiWorking) await findWorkingApiUrl();
-                await autoReAuthFromDevice();
-            } else {
-                console.log('[TMC] Refresh expired + device auth dead — waiting for /inject');
-            }
+            if (!apiWorking) await findWorkingApiUrl();
+            await autoReAuthFromDevice();
             saveTokenState();
             scheduleNextRefresh();
         }, 2000);
@@ -1154,13 +1158,9 @@ function scheduleNextRefresh() {
                                   errMsg.includes('Unauthorized') || errMsg.includes('token') || errMsg.includes('auth');
 
             if (isAuthFailure || refreshRetryCount >= 3) {
-                console.log(`[TMC] Refresh failed (${isAuthFailure ? 'auth error' : 'max retries'}) — checking re-auth...`);
+                console.log(`[TMC] Refresh failed (${isAuthFailure ? 'auth error' : 'max retries'}) — device re-auth...`);
                 refreshRetryCount = 0;
-                if (!deviceAuthDead) {
-                    await autoReAuthFromDevice();
-                } else {
-                    console.log('[TMC] Device auth dead — waiting for /inject to recover');
-                }
+                await autoReAuthFromDevice();
                 saveTokenState();
                 scheduleNextRefresh();
                 return;
@@ -1204,31 +1204,17 @@ function startAutoRefresh() {
         const refreshTimeLeft = tokenLifetime.refreshExpiresAt - Date.now();
         const accessTimeLeft = tokenLifetime.accessExpiresAt - Date.now();
         
-        // Push initial refresh token to stack
-        if (DEFAULT_TOKEN.refresh_token) {
-            pushRefreshTokenToStack(DEFAULT_TOKEN.refresh_token);
-        }
-
         // Check if tokens are completely dead on startup
         if (refreshTimeLeft <= 0 && accessTimeLeft <= 0) {
-            console.log('[TMC] Both tokens expired on startup');
-            if (!deviceAuthDead) {
-                console.log('[TMC] Attempting device re-auth (will mark dead on 400)...');
-                const reAuthResult = await autoReAuthFromDevice();
-                if (!reAuthResult || !reAuthResult.success) {
-                    console.log('[TMC] !! Startup re-auth failed. POST to /inject or use Discord /inject !!');
-                }
-            } else {
-                console.log('[TMC] !! Device auth dead — POST fresh tokens to /inject or use Discord /inject !!');
+            console.log('[TMC] Both tokens expired on startup — attempting device re-auth...');
+            const reAuthResult = await autoReAuthFromDevice();
+            if (!reAuthResult || !reAuthResult.success) {
+                console.log('[TMC] !! Startup re-auth failed. Set DEVICE_ID env var for auto re-auth !!');
             }
         } else if (refreshTimeLeft <= 60 * 60 * 1000) {
             // Refresh token is low — proactively re-auth to get fresh one
-            if (!deviceAuthDead) {
-                console.log('[TMC] Refresh token low on startup — proactively re-authing for fresh token...');
-                await autoReAuthFromDevice();
-            } else {
-                console.log('[TMC] Refresh token low on startup — device auth dead, waiting for /inject');
-            }
+            console.log('[TMC] Refresh token low on startup — proactively re-authing for fresh token...');
+            await autoReAuthFromDevice();
         } else {
             // Tokens look okay — do first refresh to validate session
             const result = await refreshTokenInStock();
@@ -1239,47 +1225,29 @@ function startAutoRefresh() {
         
         // Start smart scheduling
         scheduleNextRefresh();
-    }, 1500);
+    }, 5000);
     
-    // --- WATCHDOG: safety net every 60 seconds ---
+    // --- WATCHDOG: safety net every 90 seconds ---
     setInterval(async () => {
         const now = Date.now();
         const accessTimeLeft = tokenLifetime.accessExpiresAt - now;
         const refreshTimeLeft = tokenLifetime.refreshExpiresAt - now;
 
-        // If no refresh is scheduled and token exists, something stalled — actively refresh
+        // If no refresh is scheduled and token exists, something stalled — restart
         if (!refreshInterval && !isRefreshing && !isReAuthing && DEFAULT_TOKEN.bearer) {
-            console.log('[TMC] Watchdog: stalled — actively refreshing now');
-            const result = await refreshTokenInStock();
-            if (!result || !result.success) {
-                console.log('[TMC] Watchdog: refresh failed, will keep trying');
-            }
+            console.log('[TMC] Watchdog: stalled — restarting refresh cycle');
             scheduleNextRefresh();
             return;
         }
 
-        // Both tokens dead and not already handling it → emergency refresh (try anyway)
+        // Both tokens dead and not already handling it → emergency re-auth
         if (accessTimeLeft <= 0 && refreshTimeLeft <= 0 && !isReAuthing) {
-            console.log('[TMC] Watchdog: both tokens dead — emergency refresh attempt');
-            const result = await refreshTokenInStock();
-            if (!result || !result.success) {
-                if (!deviceAuthDead) {
-                    await autoReAuthFromDevice();
-                } else {
-                    console.log('[TMC] Watchdog: waiting for /inject');
-                }
-            }
+            console.log('[TMC] Watchdog: both tokens dead — emergency device re-auth');
+            await autoReAuthFromDevice();
             saveTokenState();
             scheduleNextRefresh();
         }
-
-        // Access token critically low (< 3 min) and not refreshing — force refresh
-        if (accessTimeLeft > 0 && accessTimeLeft < 3 * 60 * 1000 && !isRefreshing && !isReAuthing) {
-            console.log('[TMC] Watchdog: access token critical — forcing refresh');
-            await refreshTokenInStock();
-            saveTokenState();
-        }
-    }, 60 * 1000);
+    }, 90 * 1000);
 }
 
 // --- REFRESH ALL TOKENS HELPER ---
@@ -1634,10 +1602,6 @@ const commandsData = [
         .setName('cleandms')
         .setDescription('Delete all DM conversations the bot has')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-    new SlashCommandBuilder()
-        .setName('inject')
-        .setDescription('Inject fresh tokens to keep bot alive')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(cmd => cmd.toJSON());
 
 // --- READY ---
@@ -1715,7 +1679,7 @@ client.on('interactionCreate', async interaction => {
                 const health = getRefreshHealthStatus();
                 const accessStatus = health.accessRemainingMs > 0 ? `Access: **${formatRemainingTime(tokenLifetime.accessExpiresAt)}**` : 'Access: **EXPIRED**';
                 const refreshStatus = health.refreshRemainingMs > 0 ? `Refresh: **${formatRemainingTime(tokenLifetime.refreshExpiresAt)}**` : 'Refresh: **EXPIRED**';
-                const deviceStatus = deviceAuthDead ? 'Device Auth: **DEAD** (use /inject)' : (DEVICE_ID ? (DEVICE_TOKEN && DEVICE_TOKEN.length >= 50 ? 'Device Auth: **READY**' : 'Device Auth: **MISSING TOKEN**') : 'Device Auth: **NOT SET**');
+                const deviceStatus = DEVICE_ID ? (DEVICE_TOKEN && DEVICE_TOKEN.length >= 50 ? 'Device Auth: **READY**' : 'Device Auth: **MISSING TOKEN**') : 'Device Auth: **NOT SET**';
                 const reAuthStatus = isReAuthing ? 'Re-auth: **IN PROGRESS**' : '';
                 
                 const embed = new EmbedBuilder()
@@ -1724,8 +1688,7 @@ client.on('interactionCreate', async interaction => {
                         `Generate, refresh, and manage your tokens.\n\n` +
                         `${accessStatus}\n${refreshStatus}\n${deviceStatus}` +
                         (reAuthStatus ? `\n${reAuthStatus}` : '') +
-                        `\nRefreshes done: **${health.refreshesDone}**` +
-                        (deviceAuthDead ? `\n\n**Bot is alive but needs fresh tokens.**\nUse \`/inject\` or POST to \`/inject\` endpoint.` : '')
+                        `\nRefreshes done: **${health.refreshesDone}**`
                     )
                     .setColor(health.accessExpired ? 0xED4245 : 0x2ECC71)
                     .setFooter({ text: `TMC Gen` });
@@ -1739,36 +1702,6 @@ client.on('interactionCreate', async interaction => {
                 );
 
                 return interaction.reply({ embeds: [embed], components: [row1] });
-            }
-
-            if (commandName === 'inject') {
-                const modal = new ModalBuilder()
-                    .setCustomId('inject_modal')
-                    .setTitle('Inject Fresh Tokens');
-
-                const bearerInput = new TextInputBuilder()
-                    .setCustomId('inject_bearer')
-                    .setLabel("PASTE YOUR BEARER TOKEN")
-                    .setStyle(TextInputStyle.Paragraph)
-                    .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                    .setRequired(true)
-                    .setMinLength(10)
-                    .setMaxLength(2000);
-
-                const refreshInput = new TextInputBuilder()
-                    .setCustomId('inject_refresh')
-                    .setLabel("PASTE YOUR REFRESH TOKEN")
-                    .setStyle(TextInputStyle.Paragraph)
-                    .setPlaceholder("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-                    .setRequired(true)
-                    .setMinLength(10)
-                    .setMaxLength(2000);
-
-                modal.addComponents(
-                    new ActionRowBuilder().addComponents(bearerInput),
-                    new ActionRowBuilder().addComponents(refreshInput)
-                );
-                return await interaction.showModal(modal);
             }
 
             if (commandName === 'cleandms') {
@@ -1855,87 +1788,6 @@ client.on('interactionCreate', async interaction => {
             if (interaction.customId === 'device_gen_modal') {
                 return await processDeviceGenModal(interaction);
             }
-
-            if (interaction.customId === 'inject_modal') {
-                await interaction.deferReply({ flags: 64 });
-                try {
-                    const bearerInput = interaction.fields.getTextInputValue('inject_bearer').trim();
-                    const refreshInput = interaction.fields.getTextInputValue('inject_refresh').trim();
-
-                    if (!bearerInput || !refreshInput) {
-                        return interaction.editReply({ content: 'Both tokens required.' });
-                    }
-                    if (!isValidJwt(bearerInput)) {
-                        return interaction.editReply({ content: 'Invalid bearer token format.' });
-                    }
-                    if (!isValidJwt(refreshInput)) {
-                        return interaction.editReply({ content: 'Invalid refresh token format.' });
-                    }
-
-                    const newExpiry = getTokenExpiryMs(bearerInput);
-                    if (newExpiry <= Date.now()) {
-                        return interaction.editReply({ content: 'Bearer token is already expired.' });
-                    }
-
-                    // Apply tokens
-                    DEFAULT_TOKEN.bearer = bearerInput;
-                    DEFAULT_TOKEN.refresh_token = refreshInput;
-                    pushRefreshTokenToStack(refreshInput);
-                    deviceAuthDead = false;
-                    refreshRetryCount = 0;
-                    apiWorking = true;
-
-                    if (tokenStock.length > 0) {
-                        tokenStock[0] = {
-                            bearer: bearerInput,
-                            refresh: refreshInput,
-                            addedAt: Date.now(),
-                            expiresAt: newExpiry,
-                            refreshExpiresAt: getTokenExpiryMs(refreshInput),
-                            id: tokenStock[0].id || '',
-                            userId: interaction.user.id,
-                            username: interaction.user.username
-                        };
-                    } else {
-                        tokenStock.push({
-                            bearer: bearerInput,
-                            refresh: refreshInput,
-                            addedAt: Date.now(),
-                            expiresAt: newExpiry,
-                            refreshExpiresAt: getTokenExpiryMs(refreshInput),
-                            id: '',
-                            userId: interaction.user.id,
-                            username: interaction.user.username
-                        });
-                    }
-
-                    updateTokenLifetimeTracking(bearerInput, refreshInput);
-                    saveTokenState();
-
-                    // Restart refresh cycle
-                    isRefreshing = false;
-                    isReAuthing = false;
-                    failedQueue = [];
-                    processQueue(null, { success: true, bearer: bearerInput, refresh: refreshInput, expiresAt: newExpiry });
-                    scheduleNextRefresh();
-
-                    const embed = new EmbedBuilder()
-                        .setDescription(
-                            `Tokens injected!\n\n` +
-                            `Access: **${humanExpiry(newExpiry)}**\n` +
-                            `Refresh: **${humanExpiry(getTokenExpiryMs(refreshInput))}**\n` +
-                            `Device auth reset: **YES**\n` +
-                            `Refresh cycle restarted: **YES**`
-                        )
-                        .setColor(0x2ECC71)
-                        .setFooter({ text: 'TMC Inject' });
-
-                    return interaction.editReply({ embeds: [embed] });
-                } catch (err) {
-                    console.error('[TMC] Inject modal error:', err);
-                    return interaction.editReply({ content: 'Error injecting tokens.' });
-                }
-            }
         }
     } catch (err) {
         console.error(`[TMC] Error:`, err);
@@ -1944,112 +1796,6 @@ client.on('interactionCreate', async interaction => {
         }
     }
 });
-
-// --- INJECT TOKENS (POST fresh tokens to keep bot alive) ---
-function handleInject(req, res) {
-    // Read body
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-        try {
-            // Check auth header
-            const authHeader = req.headers['authorization'] || '';
-            const injectKey = authHeader.replace('Bearer ', '').trim();
-            if (injectKey !== INJECT_SECRET) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized — send Authorization: Bearer <INJECT_SECRET>' }));
-                return;
-            }
-
-            const data = JSON.parse(body);
-            const newBearer = data.bearer || data.token || data.access_token;
-            const newRefresh = data.refresh_token || data.refresh;
-
-            if (!newBearer) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Missing bearer/token field' }));
-                return;
-            }
-
-            // Validate it's a real JWT
-            if (!isValidJwt(newBearer)) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Invalid JWT format for bearer' }));
-                return;
-            }
-
-            const newExpiry = getTokenExpiryMs(newBearer);
-            if (newExpiry <= Date.now()) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Injected bearer token is already expired' }));
-                return;
-            }
-
-            // Apply
-            DEFAULT_TOKEN.bearer = newBearer;
-            if (newRefresh && isValidJwt(newRefresh)) {
-                DEFAULT_TOKEN.refresh_token = newRefresh;
-                pushRefreshTokenToStack(newRefresh);
-            }
-            deviceAuthDead = false; // reset — might have fresh tokens now
-            refreshRetryCount = 0;
-            apiWorking = true;
-
-            // Update stock
-            if (tokenStock.length > 0) {
-                tokenStock[0] = {
-                    bearer: newBearer,
-                    refresh: newRefresh || DEFAULT_TOKEN.refresh_token,
-                    addedAt: Date.now(),
-                    expiresAt: newExpiry,
-                    refreshExpiresAt: newRefresh ? getTokenExpiryMs(newRefresh) : tokenStock[0].refreshExpiresAt,
-                    id: tokenStock[0].id || '',
-                    userId: tokenStock[0].userId || 'inject',
-                    username: tokenStock[0].username || 'Inject'
-                };
-            } else {
-                tokenStock.push({
-                    bearer: newBearer,
-                    refresh: newRefresh || DEFAULT_TOKEN.refresh_token,
-                    addedAt: Date.now(),
-                    expiresAt: newExpiry,
-                    refreshExpiresAt: newRefresh ? getTokenExpiryMs(newRefresh) : 0,
-                    id: '',
-                    userId: 'inject',
-                    username: 'Inject'
-                });
-            }
-
-            updateTokenLifetimeTracking(newBearer, newRefresh || DEFAULT_TOKEN.refresh_token);
-            saveTokenState();
-
-            // Restart refresh cycle
-            if (isRefreshing || isReAuthing) {
-                console.log('[TMC] INJECT: Tokens received while re-auth in progress — overriding');
-                isRefreshing = false;
-                isReAuthing = false;
-                failedQueue = [];
-                processQueue(null, { success: true, bearer: newBearer, refresh: newRefresh, expiresAt: newExpiry });
-            }
-            scheduleNextRefresh();
-
-            console.log(`[TMC] INJECT: Fresh tokens injected! Access: ${humanExpiry(newExpiry)}`);
-            if (newRefresh) console.log(`[TMC] INJECT: Refresh: ${humanExpiry(getTokenExpiryMs(newRefresh))}`);
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-                success: true,
-                accessExpiresIn: Math.round((newExpiry - Date.now()) / 1000) + 's',
-                refreshExpiresIn: newRefresh ? Math.round((getTokenExpiryMs(newRefresh) - Date.now()) / 1000) + 's' : 'unknown',
-                refreshesDone: tokenLifetime.refreshCount,
-                refreshTokenStackSize: refreshTokenStack.length
-            }));
-        } catch (err) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Invalid JSON: ' + err.message }));
-        }
-    });
-}
 
 // --- HTTP SERVER ---
 const server = http.createServer((req, res) => {
@@ -2063,7 +1809,6 @@ const server = http.createServer((req, res) => {
             accessExpiresIn: health.accessRemainingMs > 0 ? Math.round(health.accessRemainingMs / 1000) + 's' : 'expired',
             refreshExpiresIn: health.refreshRemainingMs > 0 ? Math.round(health.refreshRemainingMs / 1000) + 's' : (health.refreshExpired ? 'expired' : 'unknown'),
             refreshesDone: health.refreshesDone,
-            deviceAuthDead: deviceAuthDead,
             timestamp: Date.now() 
         }));
         return;
@@ -2083,16 +1828,12 @@ const server = http.createServer((req, res) => {
                 remainingHuman: health.refreshRemainingMs > 0 ? formatRemainingTime(tokenLifetime.refreshExpiresAt) : (health.refreshExpired ? 'EXPIRED' : 'unknown')
             },
             refreshesDone: health.refreshesDone,
-            lastRefreshAgoMs: health.lastSuccessAgo,
-            deviceAuthDead: deviceAuthDead
+            lastRefreshAgoMs: health.lastSuccessAgo
         }));
         return;
     }
-    if (req.url === '/inject' && req.method === 'POST') {
-        return handleInject(req, res);
-    }
     res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found — Available: /, /health, /status, POST /inject');
+    res.end('Not Found — Available: /, /health, /status');
 });
 
 const PORT = process.env.PORT || 10000;
