@@ -617,7 +617,7 @@ async function generateTokenFromDevice(deviceToken, deviceID) {
     try {
         console.log('[TMC] Generating token from device auth...');
 
-        const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/device`;
+        const authUrl = `${ACTIVE_API_URL}/v2/account/authenticate/steam`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000);
         const serverKeyAuth = 'Basic ' + Buffer.from(NAKAMA_SERVER_KEY + ':').toString('base64');
@@ -751,9 +751,9 @@ async function autoReAuthFromDevice() {
             urlsToTry.unshift(ACTIVE_API_URL);
         }
         
-        // Try both auth endpoints — device auth first (primary), then steam as fallback
+        // Token is a Steam auth session ticket (hex protobuf starting with 14000000)
+        // These only work with /authenticate/steam, NOT /authenticate/device
         const authEndpoints = [
-            '/v2/account/authenticate/device',
             '/v2/account/authenticate/steam'
         ];
 
@@ -781,7 +781,8 @@ async function autoReAuthFromDevice() {
                     console.log(`[TMC DEBUG] Token length: ${DEVICE_TOKEN.length}, first10: ${DEVICE_TOKEN.substring(0,10)}, last10: ${DEVICE_TOKEN.substring(DEVICE_TOKEN.length-10)}`);
                     console.log(`[TMC DEBUG] DeviceID: ${DEVICE_ID}`);
                     console.log(`[TMC DEBUG] Body length: ${bodyStr.length}`);
-                    console.log(`[TMC DEBUG] Body: ${bodyStr.substring(0, 200)}`);
+                    console.log(`[TMC DEBUG] Full body: ${bodyStr}`);
+                    console.log(`[TMC DEBUG] serverKeyAuth: ${serverKeyAuth}`);
 
                     const response = await fetch(`${authUrl}?create=true&sync=false`, {
                         method: 'POST',
@@ -794,15 +795,18 @@ async function autoReAuthFromDevice() {
                             'Authorization': serverKeyAuth,
                             'x-unity-version': '6000.3.12f1'
                         },
-                        body: JSON.stringify(body),
+                        body: bodyStr,
                         signal: controller.signal
                     });
                     clearTimeout(timeoutId);
+                    
+                    console.log(`[TMC DEBUG] Response status: ${response.status}`);
 
                     let data = null;
                     let rawBody = '';
                     try {
                         rawBody = await response.text();
+                        console.log(`[TMC DEBUG] Response body: ${rawBody.substring(0, 500)}`);
                         data = JSON.parse(rawBody);
                     } catch (parseErr) {
                         console.log(`[TMC] ${url} (attempt ${attempt}) - Non-JSON (status ${response.status}): ${rawBody.substring(0, 150)}`);
